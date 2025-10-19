@@ -286,6 +286,12 @@ class FuelCardManager {
 
     // הוספת כרטיס חדש
     async addNewCard(command) {
+        // בדיקת הרשאות - רק מנהל יכול לנפק כרטיסים
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה לנפק כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+            return;
+        }
+
         const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
         
         if (existingIndex !== -1) {
@@ -327,6 +333,12 @@ class FuelCardManager {
 
     // עדכון כרטיס קיים
     async updateCard(command) {
+        // בדיקת הרשאות - רק מנהל יכול לעדכן כרטיסים
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה לעדכן כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+            return;
+        }
+
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
         
         if (cardIndex === -1) {
@@ -353,6 +365,12 @@ class FuelCardManager {
 
     // החזרת כרטיס
     async returnCard(command) {
+        // בדיקת הרשאות - רק מנהל יכול להחזיר כרטיסים
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה להחזיר כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+            return;
+        }
+
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
         
         if (cardIndex === -1) {
@@ -591,10 +609,22 @@ class FuelCardManager {
 
     // הוספת נתונים גדודיים לכרטיס
     async addGadudData(cardNumber, gadudName, gadudId, remainingFuel) {
+        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
+        if (!this.currentUser || this.currentUser.isAdmin) {
+            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+            return;
+        }
+
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש
+        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
 
@@ -610,10 +640,22 @@ class FuelCardManager {
 
     // עדכון נתונים גדודיים לכרטיס
     async updateGadudData(cardNumber, gadudName, gadudId, remainingFuel) {
+        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
+        if (!this.currentUser || this.currentUser.isAdmin) {
+            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+            return;
+        }
+
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש
+        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
 
@@ -629,10 +671,22 @@ class FuelCardManager {
 
     // מחיקת נתונים גדודיים מכרטיס (זיכוי גדודי)
     async clearGadudData(cardNumber) {
+        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
+        if (!this.currentUser || this.currentUser.isAdmin) {
+            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+            return;
+        }
+
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש
+        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
 
@@ -740,8 +794,56 @@ class FuelCardManager {
         
         userInfoDiv.style.display = 'block';
         
+        // הסתר/הצג כפתורים לפי הרשאות
+        this.updateButtonVisibility();
+        
         // עדכן את הטבלה לפי הרשאות
         this.renderTable();
+    }
+
+    // עדכון נראות כפתורים לפי הרשאות
+    updateButtonVisibility() {
+        const user = this.currentUser;
+        if (!user) return;
+
+        // כפתורי ניפוק/עדכון/החזרת כרטיס - רק למנהל
+        const adminButtons = [
+            'button[onclick*="startRecording(\'new\')"]',
+            'button[onclick*="showTypingForm(\'new\')"]',
+            'button[onclick*="startRecording(\'update\')"]',
+            'button[onclick*="showTypingForm(\'update\')"]',
+            'button[onclick*="startRecording(\'return\')"]',
+            'button[onclick*="showTypingForm(\'return\')"]'
+        ];
+
+        // כפתורי פעולות גדודיות - לכולם
+        const gadudButtons = [
+            'button[onclick*="showTypingForm(\'gadud_new\')"]',
+            'button[onclick*="showTypingForm(\'gadud_update\')"]',
+            'button[onclick*="showTypingForm(\'gadud_return\')"]'
+        ];
+
+        if (user.isAdmin) {
+            // מנהל - הצג הכל
+            adminButtons.forEach(selector => {
+                const buttons = document.querySelectorAll(selector);
+                buttons.forEach(btn => btn.style.display = 'block');
+            });
+            gadudButtons.forEach(selector => {
+                const buttons = document.querySelectorAll(selector);
+                buttons.forEach(btn => btn.style.display = 'block');
+            });
+        } else {
+            // משתמש רגיל - הסתר כפתורי מנהל, הצג רק גדודיים
+            adminButtons.forEach(selector => {
+                const buttons = document.querySelectorAll(selector);
+                buttons.forEach(btn => btn.style.display = 'none');
+            });
+            gadudButtons.forEach(selector => {
+                const buttons = document.querySelectorAll(selector);
+                buttons.forEach(btn => btn.style.display = 'block');
+            });
+        }
     }
 
     // סינון כרטיסים לפי הרשאות
