@@ -768,6 +768,19 @@ class FuelCardManager {
     async loadDataFromFirebase() {
         try {
             console.log('טוען נתונים מ-Firebase...');
+            
+            // בדיקה ש-Firebase נטען
+            if (!window.firebaseCollection || !window.db) {
+                console.log('Firebase עדיין לא נטען, מחכה...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (!window.firebaseCollection || !window.db) {
+                    console.log('Firebase לא נטען, עובר ל-localStorage');
+                    this.fuelCards = this.loadData();
+                    this.renderTable();
+                    return;
+                }
+            }
+            
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
             this.fuelCards = [];
             querySnapshot.forEach((doc) => {
@@ -779,7 +792,9 @@ class FuelCardManager {
             this.renderTable();
         } catch (error) {
             console.error('שגיאה בטעינת נתונים מ-Firebase:', error);
-            this.showStatus('שגיאה בטעינת נתונים', 'error');
+            console.log('עובר ל-localStorage');
+            this.fuelCards = this.loadData();
+            this.renderTable();
         }
     }
 
