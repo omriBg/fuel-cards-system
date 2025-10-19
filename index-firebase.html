@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניהול כרטיסי דלק - Firebase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .instructions {
+            background: rgba(255,255,255,0.95);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .instructions h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .instructions li:last-child {
+            border-bottom: none;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .action-btn.recording {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        .action-btn.gadud {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .action-btn.admin {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.processing {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.recording {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            animation: pulse 1.5s infinite;
+        }
+
+        .data-table {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow-x: auto;
+        }
+
+        .data-table h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .row-new {
+            background-color: #d4edda;
+        }
+
+        .row-updated {
+            background-color: #fff3cd;
+        }
+
+        .row-returned {
+            background-color: #f8d7da;
+        }
+
+        .typing-form {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .cancel-btn {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .cancel-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .voice-instructions {
+            display: none;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .instruction-content {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .example {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>מערכת ניהול כרטיסי דלק - Firebase</h1>
+            <p>הקלטה קולית חכמה לניהול כרטיסי דלק</p>
+            <div id="userInfo" style="margin-top: 15px; display: none;">
+                <span id="currentUserInfo"></span>
+                <button onclick="fuelCardManager.showAdminPanel()" id="adminPanelBtn" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    padding: 8px 15px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                    font-size: 14px;
+                    display: none;
+                ">פאנל מנהל</button>
+                <button onclick="fuelCardManager.logout()" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    padding: 8px 15px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                    font-size: 14px;
+                ">יציאה</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>הוראות שימוש:</h3>
+            <ul>
+                <li><strong>הקלטה קולית:</strong> לחץ על כפתור ההקלטה ואמור את הפרטים</li>
+                <li><strong>הקלדה ידנית:</strong> לחץ על הכפתורים המתאימים ומלא את הטופס</li>
+                <li><strong>ניפוק כרטיס:</strong> "כרטיס [מספר] [שם] [טלפון] [כמות] ליטר [סוג דלק]"</li>
+                <li><strong>עדכון כרטיס:</strong> "עדכון כרטיס [מספר], [כמות חדשה] ליטר"</li>
+                <li><strong>החזרת כרטיס:</strong> "החזרה כרטיס [מספר]"</li>
+            </ul>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="button-grid">
+            <button class="action-btn" onclick="startRecording('new')">
+                🎤 הקלטה - ניפוק כרטיס
+            </button>
+            <button class="action-btn" onclick="showTypingForm('new')">
+                ✏️ הקלדה - ניפוק כרטיס
+            </button>
+            <button class="action-btn" onclick="startRecording('update')">
+                🎤 הקלטה - עדכון כרטיס
+            </button>
+            <button class="action-btn" onclick="showTypingForm('update')">
+                ✏️ הקלדה - עדכון כרטיס
+            </button>
+            <button class="action-btn" onclick="startRecording('return')">
+                🎤 הקלטה - החזרת כרטיס
+            </button>
+            <button class="action-btn" onclick="showTypingForm('return')">
+                ✏️ הקלדה - החזרת כרטיס
+            </button>
+            <button class="action-btn gadud" onclick="showTypingForm('gadud_new')">
+                🏢 ניפוק גדודי
+            </button>
+            <button class="action-btn gadud" onclick="showTypingForm('gadud_update')">
+                🔄 עדכון גדודי
+            </button>
+            <button class="action-btn gadud" onclick="showTypingForm('gadud_return')">
+                💰 זיכוי גדודי
+            </button>
+        </div>
+
+        <!-- טופס ניפוק כרטיס חדש -->
+        <div id="newCardForm" class="typing-form">
+            <h4>ניפוק כרטיס חדש</h4>
+            <div class="form-group">
+                <label for="newCardNumber">מספר כרטיס:</label>
+                <input type="number" id="newCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-group">
+                <label for="newName">שם מלא:</label>
+                <input type="text" id="newName" placeholder="הכנס שם מלא">
+            </div>
+            <div class="form-group">
+                <label for="newPhone">טלפון:</label>
+                <input type="text" id="newPhone" placeholder="הכנס מספר טלפון">
+            </div>
+            <div class="form-group">
+                <label for="newAmount">כמות ליטר:</label>
+                <input type="number" id="newAmount" placeholder="הכנס כמות ליטר">
+            </div>
+            <div class="form-group">
+                <label for="newFuelType">סוג דלק:</label>
+                <input type="text" id="newFuelType" placeholder="הכנס סוג דלק (בנזין/דיזל)">
+            </div>
+            <div class="form-group">
+                <label for="newGadudNumber">מספר גדוד:</label>
+                <select id="newGadudNumber" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
+                    <option value="">בחר מספר גדוד</option>
+                    <option value="650">650</option>
+                    <option value="651">651</option>
+                    <option value="652">652</option>
+                    <option value="653">653</option>
+                    <option value="674">674</option>
+                    <option value="703">703</option>
+                    <option value="638">638</option>
+                    <option value="791">791</option>
+                </select>
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitNewCard()">הוסף כרטיס</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <!-- טופס עדכון כרטיס -->
+        <div id="updateCardForm" class="typing-form">
+            <h4>עדכון כרטיס</h4>
+            <div class="form-group">
+                <label for="updateCardNumber">מספר כרטיס:</label>
+                <input type="number" id="updateCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-group">
+                <label for="updateAmount">כמות חדשה (ליטר):</label>
+                <input type="number" id="updateAmount" placeholder="הכנס כמות חדשה">
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitUpdateCard()">עדכן כרטיס</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <!-- טופס החזרת כרטיס -->
+        <div id="returnCardForm" class="typing-form">
+            <h4>החזרת כרטיס</h4>
+            <div class="form-group">
+                <label for="returnCardNumber">מספר כרטיס:</label>
+                <input type="number" id="returnCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitReturnCard()">החזר כרטיס</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <!-- טופס ניפוק גדודי -->
+        <div id="gadudNewForm" class="typing-form">
+            <h4>ניפוק גדודי</h4>
+            <div class="form-group">
+                <label for="gadudCardNumber">מספר כרטיס:</label>
+                <input type="number" id="gadudCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-group">
+                <label for="gadudName">שם (ניפוק גדודי):</label>
+                <input type="text" id="gadudName" placeholder="הכנס שם">
+            </div>
+            <div class="form-group">
+                <label for="gadudId">מספר אישי (ניפוק גדודי):</label>
+                <input type="text" id="gadudId" placeholder="הכנס מספר אישי">
+            </div>
+            <div class="form-group">
+                <label for="gadudRemainingFuel">כמות דלק שנשאר (ניפוק גדודי):</label>
+                <input type="number" id="gadudRemainingFuel" placeholder="הכנס כמות דלק שנשאר">
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitGadudNew()">הוסף ניפוק גדודי</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <!-- טופס עדכון גדודי -->
+        <div id="gadudUpdateForm" class="typing-form">
+            <h4>עדכון גדודי</h4>
+            <div class="form-group">
+                <label for="gadudUpdateCardNumber">מספר כרטיס:</label>
+                <input type="number" id="gadudUpdateCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-group">
+                <label for="gadudUpdateName">שם (ניפוק גדודי):</label>
+                <input type="text" id="gadudUpdateName" placeholder="הכנס שם">
+            </div>
+            <div class="form-group">
+                <label for="gadudUpdateId">מספר אישי (ניפוק גדודי):</label>
+                <input type="text" id="gadudUpdateId" placeholder="הכנס מספר אישי">
+            </div>
+            <div class="form-group">
+                <label for="gadudUpdateRemainingFuel">כמות דלק שנשאר (ניפוק גדודי):</label>
+                <input type="number" id="gadudUpdateRemainingFuel" placeholder="הכנס כמות דלק שנשאר">
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitGadudUpdate()">עדכן ניפוק גדודי</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <!-- טופס זיכוי גדודי -->
+        <div id="gadudReturnForm" class="typing-form">
+            <h4>זיכוי גדודי</h4>
+            <div class="form-group">
+                <label for="gadudReturnCardNumber">מספר כרטיס:</label>
+                <input type="number" id="gadudReturnCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-buttons">
+                <button class="submit-btn" onclick="submitGadudReturn()">זיכוי גדודי</button>
+                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <h3 style="text-align: center; margin-bottom: 20px; color: #2c3e50;">טבלת כרטיסי דלק</h3>
+            <button class="download-btn" onclick="downloadExcel()">הורד Excel</button>
+            <table id="fuelCardsTable">
+                <thead>
+                    <tr>
+                        <!-- Headers will be generated dynamically -->
+                    </tr>
+                </thead>
+                <tbody id="fuelCardsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- טופס התחברות -->
+    <div id="loginForm" style="display: none;">
+        <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        ">
+            <div style="
+                background: white;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                text-align: center;
+                min-width: 400px;
+            ">
+                <h2 style="color: #2c3e50; margin-bottom: 30px;">התחברות למערכת</h2>
+                <div style="margin-bottom: 20px;">
+                    <input type="text" id="loginName" placeholder="שם מלא" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        margin-bottom: 15px;
+                    ">
+                </div>
+                <div style="margin-bottom: 30px;">
+                    <select id="loginGadud" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 16px;
+                    ">
+                        <option value="">בחר גדוד</option>
+                        <option value="650">גדוד 650</option>
+                        <option value="651">גדוד 651</option>
+                        <option value="652">גדוד 652</option>
+                        <option value="653">גדוד 653</option>
+                        <option value="674">גדוד 674</option>
+                        <option value="703">גדוד 703</option>
+                        <option value="638">גדוד 638</option>
+                        <option value="791">גדוד 791</option>
+                        <option value="admin">מנהל מערכת</option>
+                    </select>
+                </div>
+                <button onclick="fuelCardManager.login()" style="
+                    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    border-radius: 25px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    margin: 10px;
+                    width: 100%;
+                ">התחבר</button>
+                <div id="loginStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="firebase-config.js"></script>
+    <script src="script-firebase.js"></script>
+</body>
+</html>
