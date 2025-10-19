@@ -1,0 +1,25 @@
+{
+  "name": "fuel-card-manager",
+  "version": "1.0.0",
+  "description": "מערכת ניהול כרטיסי דלק עם הקלטה קולית",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "npx http-server -p 8000 -o"
+  },
+  "keywords": [
+    "fuel",
+    "cards",
+    "voice",
+    "recognition",
+    "hebrew",
+    "management"
+  ],
+  "author": "IDF Team",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+
+
