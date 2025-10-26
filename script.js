@@ -1207,7 +1207,7 @@ class FuelCardManager {
         // הצגת מסך פתיחה תחילה
         this.showSplashScreen();
         
-        // אחרי 3 שניות, בדוק התחברות
+        // אחרי 6 שניות, בדוק התחברות
         setTimeout(() => {
             this.hideSplashScreen();
             if (!this.currentUser) {
@@ -1215,7 +1215,7 @@ class FuelCardManager {
             } else {
                 this.showMainInterface();
             }
-        }, 3000);
+        }, 6000);
     }
 
     // הצגת מסך פתיחה
