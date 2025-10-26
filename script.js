@@ -1,101 +1,182 @@
 // מערכת ניהול כרטיסי דלק עם Firebase Firestore
 class FuelCardManager {
     constructor() {
-        console.log('מתחיל את מערכת ניהול כרטיסי הדלק עם Firebase... - עדכון חדש 2025!');
-        this.recognition = null;
-        this.isRecording = false;
-        this.fuelCards = [];
-        this.tableColumns = this.loadTableColumns();
-        this.currentUser = this.getCurrentUser();
-        console.log('עמודות טבלה:', this.tableColumns);
-        console.log('משתמש נוכחי:', this.currentUser);
-        this.initSpeechRecognition();
-        this.checkLogin();
-        this.loadDataFromFirebase();
-        console.log('המערכת מוכנה לשימוש!');
+        try {
+            console.log('מתחיל את מערכת ניהול כרטיסי הדלק עם Firebase... - עדכון חדש 2025!');
+            this.recognition = null;
+            this.isRecording = false;
+            this.fuelCards = [];
+            this.tableColumns = this.loadTableColumns();
+            this.currentUser = this.getCurrentUser();
+            this.errors = [];
+            this.isInitialized = false;
+            
+            console.log('עמודות טבלה:', this.tableColumns);
+            console.log('משתמש נוכחי:', this.currentUser);
+            
+            this.initSpeechRecognition();
+            this.checkLogin();
+            this.loadDataFromFirebase();
+            this.isInitialized = true;
+            console.log('המערכת מוכנה לשימוש!');
+        } catch (error) {
+            console.error('שגיאה באתחול המערכת:', error);
+            this.logError('Constructor Error', error);
+            this.showStatus('שגיאה באתחול המערכת', 'error');
+        }
+    }
+
+    // פונקציות לוגינג וטיפול בשגיאות
+    logError(context, error) {
+        const errorLog = {
+            timestamp: new Date().toISOString(),
+            context: context,
+            message: error.message || error,
+            stack: error.stack || 'No stack trace',
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
+        
+        this.errors.push(errorLog);
+        console.error(`[${context}]`, errorLog);
+        
+        // שמירה ל-localStorage למטרות דיבוג
+        try {
+            const existingErrors = JSON.parse(localStorage.getItem('fuelCardErrors') || '[]');
+            existingErrors.push(errorLog);
+            // שמור רק 50 השגיאות האחרונות
+            if (existingErrors.length > 50) {
+                existingErrors.splice(0, existingErrors.length - 50);
+            }
+            localStorage.setItem('fuelCardErrors', JSON.stringify(existingErrors));
+        } catch (e) {
+            console.error('שגיאה בשמירת לוג:', e);
+        }
+    }
+
+    // בדיקת תקינות קלט
+    validateInput(input, type, required = true) {
+        if (required && (!input || input.toString().trim() === '')) {
+            throw new Error(`${type} הוא שדה חובה`);
+        }
+        
+        if (input) {
+            switch (type) {
+                case 'cardNumber':
+                    if (!/^\d+$/.test(input.toString())) {
+                        throw new Error('מספר כרטיס חייב להכיל רק ספרות');
+                    }
+                    if (parseInt(input) <= 0) {
+                        throw new Error('מספר כרטיס חייב להיות חיובי');
+                    }
+                    break;
+                case 'phone':
+                    if (!/^0\d{2,3}-?\d{7}$/.test(input.toString())) {
+                        throw new Error('מספר טלפון לא תקין');
+                    }
+                    break;
+                case 'amount':
+                    if (isNaN(input) || parseInt(input) <= 0) {
+                        throw new Error('כמות חייבת להיות מספר חיובי');
+                    }
+                    break;
+                case 'name':
+                    if (input.toString().trim().length < 2) {
+                        throw new Error('שם חייב להכיל לפחות 2 תווים');
+                    }
+                    break;
+            }
+        }
+        
+        return input.toString().trim();
     }
 
     // אתחול מערכת זיהוי דיבור
     initSpeechRecognition() {
-        console.log('בודק תמיכה בהקלטה קולית...');
-        
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            console.log('הדפדפן תומך בהקלטה קולית');
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this.recognition = new SpeechRecognition();
+        try {
+            console.log('בודק תמיכה בהקלטה קולית...');
             
-            this.recognition.continuous = false;
-            this.recognition.interimResults = true;
-            this.recognition.lang = 'he-IL';
-            this.recognition.maxAlternatives = 1;
-            
-            this.recognition.onstart = () => {
-                console.log('ההקלטה התחילה');
-                this.showStatus('מקליט... (עצור ידנית או חכה 30 שניות)', 'recording');
-            };
-            
-            this.recognition.onresult = (event) => {
-                console.log('תוצאות הקלטה:', event.results);
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                console.log('הדפדפן תומך בהקלטה קולית');
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                this.recognition = new SpeechRecognition();
                 
-                // חפש תוצאה סופית
-                for (let i = event.results.length - 1; i >= 0; i--) {
-                    const result = event.results[i];
-                    if (result.isFinal && result.length > 0) {
-                        const transcript = result[0].transcript;
-                        console.log('הקלטה סופית התקבלה:', transcript);
-                        this.processVoiceCommand(transcript);
-                        return;
-                    } else if (result.length > 0) {
-                        const transcript = result[0].transcript;
-                        console.log('הקלטה זמנית:', transcript);
-                        this.showStatus('מקליט: ' + transcript, 'recording');
+                this.recognition.continuous = false;
+                this.recognition.interimResults = true;
+                this.recognition.lang = 'he-IL';
+                this.recognition.maxAlternatives = 1;
+                
+                this.recognition.onstart = () => {
+                    console.log('ההקלטה התחילה');
+                    this.showStatus('מקליט... (עצור ידנית או חכה 30 שניות)', 'recording');
+                };
+                
+                this.recognition.onresult = (event) => {
+                    console.log('תוצאות הקלטה:', event.results);
+                    
+                    // חפש תוצאה סופית
+                    for (let i = event.results.length - 1; i >= 0; i--) {
+                        const result = event.results[i];
+                        if (result.isFinal && result.length > 0) {
+                            const transcript = result[0].transcript;
+                            console.log('הקלטה סופית התקבלה:', transcript);
+                            this.processVoiceCommand(transcript);
+                            return;
+                        } else if (result.length > 0) {
+                            const transcript = result[0].transcript;
+                            console.log('הקלטה זמנית:', transcript);
+                            this.showStatus('מקליט: ' + transcript, 'recording');
+                        }
                     }
-                }
+                    
+                    // אם לא נמצאה תוצאה סופית
+                    if (event.results.length === 0) {
+                        console.log('לא התקבל טקסט מההקלטה');
+                        this.showStatus('לא התקבל טקסט מההקלטה', 'error');
+                    }
+                };
                 
-                // אם לא נמצאה תוצאה סופית
-                if (event.results.length === 0) {
-                    console.log('לא התקבל טקסט מההקלטה');
-                    this.showStatus('לא התקבל טקסט מההקלטה', 'error');
-                }
-            };
-            
-            this.recognition.onerror = (event) => {
-                console.log('שגיאה בהקלטה:', event.error);
-                this.showStatus('שגיאה בהקלטה: ' + event.error, 'error');
-                this.isRecording = false;
-            };
-            
-            this.recognition.onend = () => {
-                console.log('ההקלטה הסתיימה');
-                this.isRecording = false;
-                if (this.recordingTimeout) {
-                    clearTimeout(this.recordingTimeout);
-                    this.recordingTimeout = null;
-                }
-                if (this.countdownInterval) {
-                    clearInterval(this.countdownInterval);
-                    this.countdownInterval = null;
-                }
-                this.updateRecordButtons();
-            };
-            
-            this.recognition.onnomatch = () => {
-                console.log('לא זוהה דיבור');
-                this.showStatus('לא זוהה דיבור - נסה שוב', 'error');
-            };
-            
-            this.recognition.onspeechstart = () => {
-                console.log('זוהה דיבור');
-            };
-            
-            this.recognition.onspeechend = () => {
-                console.log('סיום דיבור');
-            };
-            
-            console.log('מערכת זיהוי דיבור מוכנה');
-        } else {
-            console.log('הדפדפן לא תומך בהקלטה קולית');
-            this.showStatus('הדפדפן לא תומך בהקלטה קולית', 'error');
+                this.recognition.onerror = (event) => {
+                    console.log('שגיאה בהקלטה:', event.error);
+                    this.showStatus('שגיאה בהקלטה: ' + event.error, 'error');
+                    this.isRecording = false;
+                };
+                
+                this.recognition.onend = () => {
+                    console.log('ההקלטה הסתיימה');
+                    this.isRecording = false;
+                    if (this.recordingTimeout) {
+                        clearTimeout(this.recordingTimeout);
+                        this.recordingTimeout = null;
+                    }
+                    if (this.countdownInterval) {
+                        clearInterval(this.countdownInterval);
+                        this.countdownInterval = null;
+                    }
+                    this.updateRecordButtons();
+                };
+                
+                this.recognition.onnomatch = () => {
+                    console.log('לא זוהה דיבור');
+                    this.showStatus('לא זוהה דיבור - נסה שוב', 'error');
+                };
+                
+                this.recognition.onspeechstart = () => {
+                    console.log('זוהה דיבור');
+                };
+                
+                this.recognition.onspeechend = () => {
+                    console.log('סיום דיבור');
+                };
+                
+                console.log('מערכת זיהוי דיבור מוכנה');
+            } else {
+                console.log('הדפדפן לא תומך בהקלטה קולית');
+                this.showStatus('הדפדפן לא תומך בהקלטה קולית', 'error');
+            }
+        } catch (error) {
+            console.error('שגיאה באתחול זיהוי דיבור:', error);
+            this.logError('Speech Recognition Init', error);
         }
     }
 
@@ -424,49 +505,67 @@ class FuelCardManager {
 
     // הוספת כרטיס חדש
     async addNewCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול לנפק כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לנפק כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-        
-        const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
-        
-        if (existingIndex !== -1) {
-            this.showStatus('כרטיס כבר קיים במערכת', 'error');
-            return;
-        }
-        
-        // אם זה מהקלטה קולית ולא מהטופס, נציג טופס בחירת גדוד
-        if (!command.gadudNumber && command.fromVoice) {
-            this.showGadudSelectionForm(command);
-            return;
-        }
-        
-        const newCard = {
-            cardNumber: command.cardNumber,
-            name: command.name,
-            phone: command.phone,
-            amount: command.amount,
-            fuelType: command.fuelType,
-            gadudNumber: command.gadudNumber || '',
-            status: 'new',
-            date: new Date().toLocaleString('he-IL'),
-            // שרשרת העברת כרטיס
-            cardChain: [{
-                action: 'ניפוק ראשוני',
-                amount: command.amount,
+        try {
+            // בדיקת הרשאות - רק מנהל יכול לנפק כרטיסים
+            if (!this.currentUser || !this.currentUser.isAdmin) {
+                this.showStatus('אין לך הרשאה לנפק כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+                return;
+            }
+            
+            // ולידציה של הקלט
+            const validatedCommand = {
+                cardNumber: this.validateInput(command.cardNumber, 'cardNumber'),
+                name: this.validateInput(command.name, 'name'),
+                phone: this.validateInput(command.phone, 'phone'),
+                amount: this.validateInput(command.amount, 'amount'),
+                fuelType: this.validateInput(command.fuelType, 'fuelType'),
+                gadudNumber: command.gadudNumber || ''
+            };
+            
+            // בדיקה שהכרטיס לא קיים
+            const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === validatedCommand.cardNumber);
+            if (existingIndex !== -1) {
+                this.showStatus('כרטיס כבר קיים במערכת', 'error');
+                return;
+            }
+            
+            // אם זה מהקלטה קולית ולא מהטופס, נציג טופס בחירת גדוד
+            if (!validatedCommand.gadudNumber && command.fromVoice) {
+                this.showGadudSelectionForm(validatedCommand);
+                return;
+            }
+            
+            const newCard = {
+                cardNumber: parseInt(validatedCommand.cardNumber),
+                name: validatedCommand.name,
+                phone: validatedCommand.phone,
+                amount: parseInt(validatedCommand.amount),
+                fuelType: validatedCommand.fuelType,
+                gadudNumber: validatedCommand.gadudNumber,
+                status: 'new',
                 date: new Date().toLocaleString('he-IL'),
-                status: 'active'
-            }],
-            currentHolder: 'system',
-            currentHolderName: 'מערכת'
-        };
-        
-        this.fuelCards.push(newCard);
-        await this.saveDataToFirebase();
-        this.renderTable();
-        this.showStatus('כרטיס חדש נוסף בהצלחה', 'success');
+                // שרשרת העברת כרטיס
+                cardChain: [{
+                    action: 'ניפוק ראשוני',
+                    amount: parseInt(validatedCommand.amount),
+                    date: new Date().toLocaleString('he-IL'),
+                    status: 'active',
+                    userName: this.currentUser.name || 'מערכת'
+                }],
+                currentHolder: 'system',
+                currentHolderName: 'מערכת'
+            };
+            
+            this.fuelCards.push(newCard);
+            await this.saveDataToFirebase();
+            this.renderTable();
+            this.showStatus('כרטיס חדש נוסף בהצלחה', 'success');
+            
+        } catch (error) {
+            console.error('שגיאה בהוספת כרטיס:', error);
+            this.logError('Add New Card', error);
+            this.showStatus('שגיאה בהוספת הכרטיס: ' + error.message, 'error');
+        }
     }
 
     // עדכון כרטיס קיים
@@ -1628,382 +1727,540 @@ function hideTypingForm() {
 
 // שליחת טופס ניפוק כרטיס חדש
 function submitNewCard() {
-    console.log('שולח טופס ניפוק כרטיס חדש');
-    
-    const cardNumber = document.getElementById('newCardNumber').value;
-    const name = document.getElementById('newName').value;
-    const phone = document.getElementById('newPhone').value;
-    const amount = document.getElementById('newAmount').value;
-    const fuelType = document.getElementById('newFuelType').value;
-    const gadudNumber = document.getElementById('newGadudNumber').value;
-    
-    // בדיקת שדות חובה
-    if (!cardNumber || !name || !phone || !amount || !fuelType) {
-        fuelCardManager.showStatus('יש למלא את כל השדות החובה', 'error');
-        return;
-    }
-    
-    // יצירת פקודה
-    const command = {
-        type: 'new',
-        cardNumber: parseInt(cardNumber),
-        name: name.trim(),
-        phone: phone.trim(),
-        amount: parseInt(amount),
-        fuelType: fuelType.trim(),
-        gadudNumber: gadudNumber || ''
-    };
-    
-    console.log('פקודה נוצרה:', command);
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס ניפוק כרטיס חדש');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('newCardNumber').value;
+        const name = document.getElementById('newName').value;
+        const phone = document.getElementById('newPhone').value;
+        const amount = document.getElementById('newAmount').value;
+        const fuelType = document.getElementById('newFuelType').value;
+        const gadudNumber = document.getElementById('newGadudNumber').value;
+        
+        // בדיקת שדות חובה
+        if (!cardNumber || !name || !phone || !amount || !fuelType) {
+            fuelCardManager.showStatus('יש למלא את כל השדות החובה', 'error');
+            return;
+        }
+        
+        // יצירת פקודה
+        const command = {
+            type: 'new',
+            cardNumber: cardNumber,
+            name: name,
+            phone: phone,
+            amount: amount,
+            fuelType: fuelType,
+            gadudNumber: gadudNumber || ''
+        };
+        
+        console.log('פקודה נוצרה:', command);
+        
+        // ביצוע הפעולה
         fuelCardManager.addNewCard(command);
         hideTypingForm();
         clearNewCardForm();
+        
     } catch (error) {
-        console.log('שגיאה בהוספת כרטיס:', error);
-        fuelCardManager.showStatus('שגיאה בהוספת הכרטיס: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit New Card', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // שליחת טופס עדכון כרטיס
 function submitUpdateCard() {
-    console.log('שולח טופס עדכון כרטיס');
-    
-    const cardNumber = document.getElementById('updateCardNumber').value;
-    const amount = document.getElementById('updateAmount').value;
-    
-    // בדיקת שדות חובה
-    if (!cardNumber || !amount) {
-        fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
-        return;
-    }
-    
-    // יצירת פקודה
-    const command = {
-        type: 'update',
-        cardNumber: parseInt(cardNumber),
-        amount: parseInt(amount)
-    };
-    
-    console.log('פקודת עדכון נוצרה:', command);
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס עדכון כרטיס');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('updateCardNumber').value;
+        const amount = document.getElementById('updateAmount').value;
+        
+        // בדיקת שדות חובה
+        if (!cardNumber || !amount) {
+            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            return;
+        }
+        
+        // יצירת פקודה
+        const command = {
+            type: 'update',
+            cardNumber: cardNumber,
+            amount: amount
+        };
+        
+        console.log('פקודת עדכון נוצרה:', command);
+        
+        // ביצוע הפעולה
         fuelCardManager.updateCard(command);
         hideTypingForm();
         clearUpdateCardForm();
+        
     } catch (error) {
-        console.log('שגיאה בעדכון כרטיס:', error);
-        fuelCardManager.showStatus('שגיאה בעדכון הכרטיס: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס עדכון:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit Update Card', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // שליחת טופס החזרת כרטיס
 function submitReturnCard() {
-    console.log('שולח טופס החזרת כרטיס');
-    
-    const cardNumber = document.getElementById('returnCardNumber').value;
-    
-    // בדיקת שדה חובה
-    if (!cardNumber) {
-        fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
-        return;
-    }
-    
-    // יצירת פקודה
-    const command = {
-        type: 'return',
-        cardNumber: parseInt(cardNumber)
-    };
-    
-    console.log('פקודת החזרה נוצרה:', command);
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס החזרת כרטיס');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('returnCardNumber').value;
+        
+        // בדיקת שדה חובה
+        if (!cardNumber) {
+            fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
+            return;
+        }
+        
+        // יצירת פקודה
+        const command = {
+            type: 'return',
+            cardNumber: cardNumber
+        };
+        
+        console.log('פקודת החזרה נוצרה:', command);
+        
+        // ביצוע הפעולה
         fuelCardManager.returnCard(command);
         hideTypingForm();
         clearReturnCardForm();
+        
     } catch (error) {
-        console.log('שגיאה בהחזרת כרטיס:', error);
-        fuelCardManager.showStatus('שגיאה בהחזרת הכרטיס: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס החזרה:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit Return Card', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // ניקוי טופס ניפוק כרטיס חדש
 function clearNewCardForm() {
-    document.getElementById('newCardNumber').value = '';
-    document.getElementById('newName').value = '';
-    document.getElementById('newPhone').value = '';
-    document.getElementById('newAmount').value = '';
-    document.getElementById('newFuelType').value = '';
-    document.getElementById('newGadudNumber').value = '';
+    try {
+        const fields = ['newCardNumber', 'newName', 'newPhone', 'newAmount', 'newFuelType', 'newGadudNumber'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+            }
+        });
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס:', error);
+    }
 }
 
 // ניקוי טופס עדכון כרטיס
 function clearUpdateCardForm() {
-    document.getElementById('updateCardNumber').value = '';
-    document.getElementById('updateAmount').value = '';
+    try {
+        const fields = ['updateCardNumber', 'updateAmount'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+            }
+        });
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס עדכון:', error);
+    }
 }
 
 // ניקוי טופס החזרת כרטיס
 function clearReturnCardForm() {
-    document.getElementById('returnCardNumber').value = '';
+    try {
+        const field = document.getElementById('returnCardNumber');
+        if (field) {
+            field.value = '';
+        }
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס החזרה:', error);
+    }
 }
 
 // שליחת טופס ניפוק גדודי
 function submitGadudNew() {
-    console.log('שולח טופס ניפוק גדודי');
-    
-    const cardNumber = document.getElementById('gadudCardNumber').value;
-    const gadudName = document.getElementById('gadudName').value;
-    const gadudId = document.getElementById('gadudId').value;
-    const remainingFuel = document.getElementById('gadudRemainingFuel').value;
-    
-    // בדיקת שדות חובה
-    if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
-        fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
-        return;
-    }
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס ניפוק גדודי');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('gadudCardNumber').value;
+        const gadudName = document.getElementById('gadudName').value;
+        const gadudId = document.getElementById('gadudId').value;
+        const remainingFuel = document.getElementById('gadudRemainingFuel').value;
+        
+        // בדיקת שדות חובה
+        if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
+            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            return;
+        }
+        
+        // ביצוע הפעולה
         fuelCardManager.addGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudNewForm();
+        
     } catch (error) {
-        console.log('שגיאה בהוספת ניפוק גדודי:', error);
-        fuelCardManager.showStatus('שגיאה בהוספת ניפוק גדודי: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס ניפוק גדודי:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit Gadud New', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // שליחת טופס עדכון גדודי
 function submitGadudUpdate() {
-    console.log('שולח טופס עדכון גדודי');
-    
-    const cardNumber = document.getElementById('gadudUpdateCardNumber').value;
-    const gadudName = document.getElementById('gadudUpdateName').value;
-    const gadudId = document.getElementById('gadudUpdateId').value;
-    const remainingFuel = document.getElementById('gadudUpdateRemainingFuel').value;
-    
-    // בדיקת שדות חובה
-    if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
-        fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
-        return;
-    }
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס עדכון גדודי');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('gadudUpdateCardNumber').value;
+        const gadudName = document.getElementById('gadudUpdateName').value;
+        const gadudId = document.getElementById('gadudUpdateId').value;
+        const remainingFuel = document.getElementById('gadudUpdateRemainingFuel').value;
+        
+        // בדיקת שדות חובה
+        if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
+            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            return;
+        }
+        
+        // ביצוע הפעולה
         fuelCardManager.updateGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudUpdateForm();
+        
     } catch (error) {
-        console.log('שגיאה בעדכון גדודי:', error);
-        fuelCardManager.showStatus('שגיאה בעדכון גדודי: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס עדכון גדודי:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit Gadud Update', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // שליחת טופס זיכוי גדודי
 function submitGadudReturn() {
-    console.log('שולח טופס זיכוי גדודי');
-    
-    const cardNumber = document.getElementById('gadudReturnCardNumber').value;
-    
-    // בדיקת שדה חובה
-    if (!cardNumber) {
-        fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
-        return;
-    }
-    
-    // ביצוע הפעולה
     try {
+        console.log('שולח טופס זיכוי גדודי');
+        
+        // בדיקה שהמערכת מוכנה
+        if (!window.fuelCardManager || !window.fuelCardManager.isInitialized) {
+            console.error('המערכת לא מוכנה');
+            return;
+        }
+        
+        const cardNumber = document.getElementById('gadudReturnCardNumber').value;
+        
+        // בדיקת שדה חובה
+        if (!cardNumber) {
+            fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
+            return;
+        }
+        
+        // ביצוע הפעולה
         fuelCardManager.clearGadudData(parseInt(cardNumber));
         hideTypingForm();
         clearGadudReturnForm();
+        
     } catch (error) {
-        console.log('שגיאה בזיכוי גדודי:', error);
-        fuelCardManager.showStatus('שגיאה בזיכוי גדודי: ' + error.message, 'error');
+        console.error('שגיאה בשליחת טופס זיכוי גדודי:', error);
+        if (window.fuelCardManager) {
+            window.fuelCardManager.logError('Submit Gadud Return', error);
+            window.fuelCardManager.showStatus('שגיאה בשליחת הטופס: ' + error.message, 'error');
+        }
     }
 }
 
 // ניקוי טופס ניפוק גדודי
 function clearGadudNewForm() {
-    document.getElementById('gadudCardNumber').value = '';
-    document.getElementById('gadudName').value = '';
-    document.getElementById('gadudId').value = '';
-    document.getElementById('gadudRemainingFuel').value = '';
+    try {
+        const fields = ['gadudCardNumber', 'gadudName', 'gadudId', 'gadudRemainingFuel'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+            }
+        });
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס ניפוק גדודי:', error);
+    }
 }
 
 // ניקוי טופס עדכון גדודי
 function clearGadudUpdateForm() {
-    document.getElementById('gadudUpdateCardNumber').value = '';
-    document.getElementById('gadudUpdateName').value = '';
-    document.getElementById('gadudUpdateId').value = '';
-    document.getElementById('gadudUpdateRemainingFuel').value = '';
+    try {
+        const fields = ['gadudUpdateCardNumber', 'gadudUpdateName', 'gadudUpdateId', 'gadudUpdateRemainingFuel'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = '';
+            }
+        });
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס עדכון גדודי:', error);
+    }
 }
 
 // ניקוי טופס זיכוי גדודי
 function clearGadudReturnForm() {
-    document.getElementById('gadudReturnCardNumber').value = '';
+    try {
+        const field = document.getElementById('gadudReturnCardNumber');
+        if (field) {
+            field.value = '';
+        }
+    } catch (error) {
+        console.error('שגיאה בניקוי טופס זיכוי גדודי:', error);
+    }
 }
 
 // הצגת הוראות קוליות
 function showVoiceInstructions(action) {
-    const instructionsDiv = document.getElementById('voiceInstructions');
-    const instructionText = document.getElementById('instructionText');
-    
-    let content = '';
-    
-    if (action === 'new') {
-        content = `
-            <div class="instruction-content">
-                <strong>ניפוק כרטיס חדש</strong><br>
-                אמור את הפרטים הבאים בסדר הזה:
-            </div>
-            <div class="example">
-                "כרטיס [מספר] [שם] [טלפון] [כמות] ליטר [סוג דלק]"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "כרטיס 123 עומרי בן גיגי 05-06620734 50 ליטר בנזין"
-            </div>
-            <div class="instruction-content">
-                <strong>או עם פסיקים:</strong><br>
-                "כרטיס 123, עומרי בן גיגי, 05-06620734, 50 ליטר, בנזין"
-            </div>
-        `;
-    } else if (action === 'update') {
-        content = `
-            <div class="instruction-content">
-                <strong>עדכון כרטיס</strong><br>
-                אמור את הפרטים הבאים:
-            </div>
-            <div class="example">
-                "עדכון כרטיס [מספר], [כמות חדשה] ליטר"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "עדכון כרטיס 12345, 30 ליטר"
-            </div>
-        `;
-    } else if (action === 'return') {
-        content = `
-            <div class="instruction-content">
-                <strong>החזרת כרטיס</strong><br>
-                אמור את הפרטים הבאים:
-            </div>
-            <div class="example">
-                "החזרה כרטיס [מספר]"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "החזרה כרטיס 12345"
-            </div>
-        `;
-    } else if (action === 'gadud_new') {
-        content = `
-            <div class="instruction-content">
-                <strong>ניפוק גדודי</strong><br>
-                אמור את הפרטים הבאים:
-            </div>
-            <div class="example">
-                "ניפוק גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "ניפוק גדודי כרטיס 123 יוסי כהן 1234567 30"
-            </div>
-        `;
-    } else if (action === 'gadud_update') {
-        content = `
-            <div class="instruction-content">
-                <strong>עדכון גדודי</strong><br>
-                אמור את הפרטים הבאים:
-            </div>
-            <div class="example">
-                "עדכון גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "עדכון גדודי כרטיס 123 יוסי כהן 1234567 20"
-            </div>
-        `;
-    } else if (action === 'gadud_return') {
-        content = `
-            <div class="instruction-content">
-                <strong>זיכוי גדודי</strong><br>
-                אמור את הפרטים הבאים:
-            </div>
-            <div class="example">
-                "זיכוי גדודי כרטיס [מספר]"
-            </div>
-            <div class="instruction-content">
-                <strong>דוגמה:</strong><br>
-                "זיכוי גדודי כרטיס 123"
-            </div>
-        `;
+    try {
+        const instructionsDiv = document.getElementById('voiceInstructions');
+        const instructionText = document.getElementById('instructionText');
+        
+        if (!instructionsDiv || !instructionText) {
+            console.error('אלמנטים לא נמצאו');
+            return;
+        }
+        
+        let content = '';
+        
+        if (action === 'new') {
+            content = `
+                <div class="instruction-content">
+                    <strong>ניפוק כרטיס חדש</strong><br>
+                    אמור את הפרטים הבאים בסדר הזה:
+                </div>
+                <div class="example">
+                    "כרטיס [מספר] [שם] [טלפון] [כמות] ליטר [סוג דלק]"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "כרטיס 123 עומרי בן גיגי 05-06620734 50 ליטר בנזין"
+                </div>
+                <div class="instruction-content">
+                    <strong>או עם פסיקים:</strong><br>
+                    "כרטיס 123, עומרי בן גיגי, 05-06620734, 50 ליטר, בנזין"
+                </div>
+            `;
+        } else if (action === 'update') {
+            content = `
+                <div class="instruction-content">
+                    <strong>עדכון כרטיס</strong><br>
+                    אמור את הפרטים הבאים:
+                </div>
+                <div class="example">
+                    "עדכון כרטיס [מספר], [כמות חדשה] ליטר"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "עדכון כרטיס 12345, 30 ליטר"
+                </div>
+            `;
+        } else if (action === 'return') {
+            content = `
+                <div class="instruction-content">
+                    <strong>החזרת כרטיס</strong><br>
+                    אמור את הפרטים הבאים:
+                </div>
+                <div class="example">
+                    "החזרה כרטיס [מספר]"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "החזרה כרטיס 12345"
+                </div>
+            `;
+        } else if (action === 'gadud_new') {
+            content = `
+                <div class="instruction-content">
+                    <strong>ניפוק גדודי</strong><br>
+                    אמור את הפרטים הבאים:
+                </div>
+                <div class="example">
+                    "ניפוק גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "ניפוק גדודי כרטיס 123 יוסי כהן 1234567 30"
+                </div>
+            `;
+        } else if (action === 'gadud_update') {
+            content = `
+                <div class="instruction-content">
+                    <strong>עדכון גדודי</strong><br>
+                    אמור את הפרטים הבאים:
+                </div>
+                <div class="example">
+                    "עדכון גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "עדכון גדודי כרטיס 123 יוסי כהן 1234567 20"
+                </div>
+            `;
+        } else if (action === 'gadud_return') {
+            content = `
+                <div class="instruction-content">
+                    <strong>זיכוי גדודי</strong><br>
+                    אמור את הפרטים הבאים:
+                </div>
+                <div class="example">
+                    "זיכוי גדודי כרטיס [מספר]"
+                </div>
+                <div class="instruction-content">
+                    <strong>דוגמה:</strong><br>
+                    "זיכוי גדודי כרטיס 123"
+                </div>
+            `;
+        }
+        
+        instructionText.innerHTML = content;
+        instructionsDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('שגיאה בהצגת הוראות:', error);
     }
-    
-    instructionText.innerHTML = content;
-    instructionsDiv.style.display = 'block';
 }
 
 // הסתרת הוראות
 function hideInstructions() {
-    const instructionsDiv = document.getElementById('voiceInstructions');
-    instructionsDiv.style.display = 'none';
+    try {
+        const instructionsDiv = document.getElementById('voiceInstructions');
+        if (instructionsDiv) {
+            instructionsDiv.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('שגיאה בהסתרת הוראות:', error);
+    }
 }
 
 // הוספת תמיכה במקלדת לטופסים
 document.addEventListener('DOMContentLoaded', function() {
-    // תמיכה במקלדת לטופס ניפוק כרטיס חדש
-    const newCardInputs = ['newCardNumber', 'newName', 'newPhone', 'newAmount', 'newFuelType'];
-    newCardInputs.forEach(inputId => {
-        const input = document.getElementById(inputId);
-        if (input) {
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    submitNewCard();
-                } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    hideTypingForm();
-                }
-            });
-        }
-    });
-    
-    // תמיכה במקלדת לטופס עדכון כרטיס
-    const updateCardInputs = ['updateCardNumber', 'updateAmount'];
-    updateCardInputs.forEach(inputId => {
-        const input = document.getElementById(inputId);
-        if (input) {
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    submitUpdateCard();
-                } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    hideTypingForm();
-                }
-            });
-        }
-    });
-    
-    // תמיכה במקלדת לטופס החזרת כרטיס
-    const returnCardInput = document.getElementById('returnCardNumber');
-    if (returnCardInput) {
-        returnCardInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitReturnCard();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                hideTypingForm();
+    try {
+        console.log('מתחיל להגדיר תמיכה במקלדת...');
+        
+        // תמיכה במקלדת לטופס ניפוק כרטיס חדש
+        const newCardInputs = ['newCardNumber', 'newName', 'newPhone', 'newAmount', 'newFuelType', 'newGadudNumber'];
+        newCardInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    try {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            submitNewCard();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            hideTypingForm();
+                        }
+                    } catch (error) {
+                        console.error('שגיאה בטיפול במקלדת:', error);
+                    }
+                });
             }
         });
+        
+        // תמיכה במקלדת לטופס עדכון כרטיס
+        const updateCardInputs = ['updateCardNumber', 'updateAmount'];
+        updateCardInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    try {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            submitUpdateCard();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            hideTypingForm();
+                        }
+                    } catch (error) {
+                        console.error('שגיאה בטיפול במקלדת:', error);
+                    }
+                });
+            }
+        });
+        
+        // תמיכה במקלדת לטופס החזרת כרטיס
+        const returnCardInput = document.getElementById('returnCardNumber');
+        if (returnCardInput) {
+            returnCardInput.addEventListener('keydown', function(e) {
+                try {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitReturnCard();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        hideTypingForm();
+                    }
+                } catch (error) {
+                    console.error('שגיאה בטיפול במקלדת:', error);
+                }
+            });
+        }
+        
+        // תמיכה במקלדת לטופסי גדוד
+        const gadudInputs = ['gadudCardNumber', 'gadudName', 'gadudId', 'gadudRemainingFuel'];
+        gadudInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    try {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            submitGadudNew();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            hideTypingForm();
+                        }
+                    } catch (error) {
+                        console.error('שגיאה בטיפול במקלדת:', error);
+                    }
+                });
+            }
+        });
+        
+        console.log('תמיכה במקלדת הופעלה בהצלחה');
+        
+    } catch (error) {
+        console.error('שגיאה בהגדרת תמיכה במקלדת:', error);
     }
-    
-    console.log('תמיכה במקלדת הופעלה');
 });
