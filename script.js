@@ -1146,7 +1146,7 @@ class FuelCardManager {
                 if (mainContainer) {
                     mainContainer.style.display = 'block';
                 }
-            }, 800); // זמן האנימציה
+            }, 600); // זמן האנימציה
         }
     }
 
