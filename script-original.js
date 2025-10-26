@@ -862,3 +862,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('תמיכה במקלדת הופעלה');
 });
+
+
+

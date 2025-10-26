@@ -1097,20 +1097,65 @@ class FuelCardManager {
     logout() {
         localStorage.removeItem('currentUser');
         this.currentUser = null;
-        this.showLoginForm();
+        this.showSplashScreen();
+        setTimeout(() => {
+            this.hideSplashScreen();
+            this.showLoginForm();
+        }, 2000);
     }
 
     checkLogin() {
-        if (!this.currentUser) {
-            this.showLoginForm();
-        } else {
-            this.showMainInterface();
+        // הצגת מסך פתיחה תחילה
+        this.showSplashScreen();
+        
+        // אחרי 3 שניות, בדוק התחברות
+        setTimeout(() => {
+            this.hideSplashScreen();
+            if (!this.currentUser) {
+                this.showLoginForm();
+            } else {
+                this.showMainInterface();
+            }
+        }, 3000);
+    }
+
+    // הצגת מסך פתיחה
+    showSplashScreen() {
+        const splashScreen = document.getElementById('splashScreen');
+        const mainContainer = document.getElementById('mainContainer');
+        
+        if (splashScreen) {
+            splashScreen.style.display = 'flex';
+        }
+        if (mainContainer) {
+            mainContainer.style.display = 'none';
+        }
+    }
+
+    // הסתרת מסך פתיחה
+    hideSplashScreen() {
+        const splashScreen = document.getElementById('splashScreen');
+        const mainContainer = document.getElementById('mainContainer');
+        
+        if (splashScreen) {
+            splashScreen.classList.add('fade-out');
+            
+            // אחרי האנימציה, הסתר את מסך הפתיחה והצג את הממשק הראשי
+            setTimeout(() => {
+                splashScreen.style.display = 'none';
+                if (mainContainer) {
+                    mainContainer.style.display = 'block';
+                }
+            }, 800); // זמן האנימציה
         }
     }
 
     showLoginForm() {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const mainContainer = document.getElementById('mainContainer');
+        if (mainContainer) {
+            mainContainer.style.display = 'none';
+        }
         
         // הצג טופס התחברות
         document.getElementById('loginForm').style.display = 'block';
@@ -1121,7 +1166,10 @@ class FuelCardManager {
         document.getElementById('loginForm').style.display = 'none';
         
         // הצג את הממשק הראשי
-        document.querySelector('.container').style.display = 'block';
+        const mainContainer = document.getElementById('mainContainer');
+        if (mainContainer) {
+            mainContainer.style.display = 'block';
+        }
         
         // עדכן את הממשק לפי הרשאות המשתמש
         this.updateInterfaceByPermissions();
@@ -1248,7 +1296,10 @@ class FuelCardManager {
     // הצגת טופס בחירת גדוד אחרי הקלטה קולית
     showGadudSelectionForm(command) {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const mainContainer = document.getElementById('mainContainer');
+        if (mainContainer) {
+            mainContainer.style.display = 'none';
+        }
         
         // צור/הצג טופס בחירת גדוד
         let gadudForm = document.getElementById('gadudSelectionForm');
@@ -1344,7 +1395,10 @@ class FuelCardManager {
         
         // סגור את הטופס
         gadudForm.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const mainContainer = document.getElementById('mainContainer');
+        if (mainContainer) {
+            mainContainer.style.display = 'block';
+        }
         
         // המשך עם יצירת הכרטיס
         this.addNewCard(command);
@@ -1353,7 +1407,10 @@ class FuelCardManager {
     cancelGadudSelection() {
         const gadudForm = document.getElementById('gadudSelectionForm');
         gadudForm.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const mainContainer = document.getElementById('mainContainer');
+        if (mainContainer) {
+            mainContainer.style.display = 'block';
+        }
         this.showStatus('ניפוק הכרטיס בוטל', 'error');
     }
 
@@ -1366,7 +1423,11 @@ class FuelCardManager {
             this.saveData();
             this.renderTable();
             this.showStatus('כל הנתונים נמחקו', 'success');
-            this.showLoginForm();
+            this.showSplashScreen();
+            setTimeout(() => {
+                this.hideSplashScreen();
+                this.showLoginForm();
+            }, 2000);
         }
     }
 
@@ -1384,7 +1445,11 @@ class FuelCardManager {
             
             // רענון הממשק
             this.renderTable();
-            this.showLoginForm();
+            this.showSplashScreen();
+            setTimeout(() => {
+                this.hideSplashScreen();
+                this.showLoginForm();
+            }, 2000);
             
             this.showStatus('המערכת אופסה בהצלחה', 'success');
         }
