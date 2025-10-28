@@ -578,7 +578,7 @@ class FuelCardManager {
             return;
         }
         
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -602,7 +602,7 @@ class FuelCardManager {
             return;
         }
         
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -620,7 +620,7 @@ class FuelCardManager {
 
     // העברת כרטיס לאדם אחר
     transferCard(cardNumber, newHolderName, newHolderPhone, amountUsed) {
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -652,7 +652,7 @@ class FuelCardManager {
 
     // עדכון כרטיס על ידי המחזיק הנוכחי
     updateCardByHolder(cardNumber, amountUsed, notes) {
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -682,7 +682,7 @@ class FuelCardManager {
 
     // החזרת כרטיס למנהל (זיכוי סופי)
     finalReturn(cardNumber) {
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -1100,7 +1100,7 @@ class FuelCardManager {
             return;
         }
 
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -1131,7 +1131,7 @@ class FuelCardManager {
             return;
         }
 
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -1162,7 +1162,7 @@ class FuelCardManager {
             return;
         }
 
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(cardNumber));
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
