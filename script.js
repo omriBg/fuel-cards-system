@@ -1,27 +1,29 @@
 // מערכת ניהול כרטיסי דלק עם Firebase Firestore
 class FuelCardManager {
     constructor() {
+        console.log('מתחיל את מערכת ניהול כרטיסי הדלק עם Firebase... - עדכון חדש 2025!');
+        this.recognition = null;
+        this.isRecording = false;
+        this.fuelCards = [];
+        this.tableColumns = this.loadTableColumns();
+        this.currentUser = this.getCurrentUser();
+        this.errors = [];
+        this.isInitialized = false;
+        
+        console.log('עמודות טבלה:', this.tableColumns);
+        console.log('משתמש נוכחי:', this.currentUser);
+    }
+
+    async initialize() {
         try {
-            console.log('מתחיל את מערכת ניהול כרטיסי הדלק עם Firebase... - עדכון חדש 2025!');
-            this.recognition = null;
-            this.isRecording = false;
-            this.fuelCards = [];
-            this.tableColumns = this.loadTableColumns();
-            this.currentUser = this.getCurrentUser();
-            this.errors = [];
-            this.isInitialized = false;
-            
-            console.log('עמודות טבלה:', this.tableColumns);
-            console.log('משתמש נוכחי:', this.currentUser);
-            
             this.initSpeechRecognition();
             this.checkLogin();
-            this.loadDataFromFirebase();
+            await this.loadDataFromFirebase();
             this.isInitialized = true;
             console.log('המערכת מוכנה לשימוש!');
         } catch (error) {
             console.error('שגיאה באתחול המערכת:', error);
-            this.logError('Constructor Error', error);
+            this.logError('Initialize Error', error);
             this.showStatus('שגיאה באתחול המערכת', 'error');
         }
     }
@@ -1669,16 +1671,39 @@ class FuelCardManager {
 
 // אתחול המערכת
 console.log('מתחיל לטעון את המערכת...');
-const fuelCardManager = new FuelCardManager();
-console.log('המערכת נטענה בהצלחה!');
+let fuelCardManager;
+
+async function initializeSystem() {
+    try {
+        fuelCardManager = new FuelCardManager();
+        await fuelCardManager.initialize();
+        window.fuelCardManager = fuelCardManager;
+        console.log('המערכת נטענה בהצלחה!');
+    } catch (error) {
+        console.error('שגיאה באתחול המערכת:', error);
+    }
+}
+
+// התחל את האתחול
+initializeSystem();
 
 // פונקציות גלובליות
 function startRecording(action) {
-    fuelCardManager.startRecording(action);
+    if (window.fuelCardManager && window.fuelCardManager.isInitialized) {
+        window.fuelCardManager.startRecording(action);
+    } else {
+        console.log('המערכת עדיין לא מוכנה, מחכה...');
+        setTimeout(() => startRecording(action), 1000);
+    }
 }
 
 function downloadExcel() {
-    fuelCardManager.downloadExcel();
+    if (window.fuelCardManager && window.fuelCardManager.isInitialized) {
+        window.fuelCardManager.downloadExcel();
+    } else {
+        console.log('המערכת עדיין לא מוכנה, מחכה...');
+        setTimeout(() => downloadExcel(), 1000);
+    }
 }
 
 // הצגת טופס הקלדה - פונקציה גלובלית
@@ -1745,7 +1770,7 @@ function submitNewCard() {
         
         // בדיקת שדות חובה
         if (!cardNumber || !name || !phone || !amount || !fuelType) {
-            fuelCardManager.showStatus('יש למלא את כל השדות החובה', 'error');
+            window.fuelCardManager.showStatus('יש למלא את כל השדות החובה', 'error');
             return;
         }
         
@@ -1763,7 +1788,7 @@ function submitNewCard() {
         console.log('פקודה נוצרה:', command);
         
         // ביצוע הפעולה
-        fuelCardManager.addNewCard(command);
+        window.fuelCardManager.addNewCard(command);
         hideTypingForm();
         clearNewCardForm();
         
@@ -1792,7 +1817,7 @@ function submitUpdateCard() {
         
         // בדיקת שדות חובה
         if (!cardNumber || !amount) {
-            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            window.fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
             return;
         }
         
@@ -1806,7 +1831,7 @@ function submitUpdateCard() {
         console.log('פקודת עדכון נוצרה:', command);
         
         // ביצוע הפעולה
-        fuelCardManager.updateCard(command);
+        window.fuelCardManager.updateCard(command);
         hideTypingForm();
         clearUpdateCardForm();
         
@@ -1834,7 +1859,7 @@ function submitReturnCard() {
         
         // בדיקת שדה חובה
         if (!cardNumber) {
-            fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
+            window.fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
             return;
         }
         
@@ -1847,7 +1872,7 @@ function submitReturnCard() {
         console.log('פקודת החזרה נוצרה:', command);
         
         // ביצוע הפעולה
-        fuelCardManager.returnCard(command);
+        window.fuelCardManager.returnCard(command);
         hideTypingForm();
         clearReturnCardForm();
         
@@ -1920,12 +1945,12 @@ function submitGadudNew() {
         
         // בדיקת שדות חובה
         if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
-            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            window.fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
             return;
         }
         
         // ביצוע הפעולה
-        fuelCardManager.addGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
+        window.fuelCardManager.addGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudNewForm();
         
@@ -1956,12 +1981,12 @@ function submitGadudUpdate() {
         
         // בדיקת שדות חובה
         if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
-            fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+            window.fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
             return;
         }
         
         // ביצוע הפעולה
-        fuelCardManager.updateGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
+        window.fuelCardManager.updateGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudUpdateForm();
         
@@ -1989,12 +2014,12 @@ function submitGadudReturn() {
         
         // בדיקת שדה חובה
         if (!cardNumber) {
-            fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
+            window.fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
             return;
         }
         
         // ביצוע הפעולה
-        fuelCardManager.clearGadudData(parseInt(cardNumber));
+        window.fuelCardManager.clearGadudData(parseInt(cardNumber));
         hideTypingForm();
         clearGadudReturnForm();
         
