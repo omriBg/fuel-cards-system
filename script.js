@@ -10,6 +10,14 @@ class FuelCardManager {
         this.errors = [];
         this.isInitialized = false;
         
+        // מערכת הגבלת קצב בקשות
+        this.rateLimiter = {
+            requests: new Map(),
+            maxRequests: 100, // מקסימום בקשות לדקה
+            windowMs: 60000, // חלון זמן של דקה
+            maxConcurrent: 10 // מקסימום בקשות בו-זמנית
+        };
+        
         console.log('עמודות טבלה:', this.tableColumns);
         console.log('משתמש נוכחי:', this.currentUser);
     }
@@ -56,41 +64,174 @@ class FuelCardManager {
         }
     }
 
-    // בדיקת תקינות קלט
+    // בדיקת תקינות קלט מחמירה
     validateInput(input, type, required = true) {
+        // בדיקת null/undefined
         if (required && (!input || input.toString().trim() === '')) {
             throw new Error(`${type} הוא שדה חובה`);
+        }
+        
+        // בדיקת אורך מקסימלי
+        if (input && input.toString().length > 1000) {
+            throw new Error('קלט ארוך מדי');
         }
         
         if (input) {
             switch (type) {
                 case 'cardNumber':
-                    if (!/^\d+$/.test(input.toString())) {
-                        throw new Error('מספר כרטיס חייב להכיל רק ספרות');
+                    const cardStr = input.toString().trim();
+                    if (!/^\d{1,6}$/.test(cardStr)) {
+                        throw new Error('מספר כרטיס חייב להכיל רק ספרות (1-6 ספרות)');
                     }
-                    if (parseInt(input) <= 0) {
-                        throw new Error('מספר כרטיס חייב להיות חיובי');
+                    const cardNum = parseInt(cardStr);
+                    if (cardNum < 1 || cardNum > 999999) {
+                        throw new Error('מספר כרטיס חייב להיות בין 1 ל-999999');
                     }
-                    break;
-                case 'phone':
-                    if (!/^0\d{2,3}-?\d{7}$/.test(input.toString())) {
-                        throw new Error('מספר טלפון לא תקין');
-                    }
-                    break;
-                case 'amount':
-                    if (isNaN(input) || parseInt(input) <= 0) {
-                        throw new Error('כמות חייבת להיות מספר חיובי');
-                    }
-                    break;
+                    return cardNum;
+                    
                 case 'name':
-                    if (input.toString().trim().length < 2) {
-                        throw new Error('שם חייב להכיל לפחות 2 תווים');
+                    const name = input.toString().trim();
+                    if (name.length < 2 || name.length > 50) {
+                        throw new Error('שם חייב להיות בין 2 ל-50 תווים');
                     }
-                    break;
+                    // רק אותיות עבריות, רווחים ומינוס
+                    if (!/^[\u0590-\u05FF\s\-]+$/.test(name)) {
+                        throw new Error('שם חייב להכיל רק אותיות עבריות, רווחים ומינוס');
+                    }
+                    // בדיקת תווים מסוכנים
+                    if (/[<>\"'&]/.test(name)) {
+                        throw new Error('שם מכיל תווים לא מורשים');
+                    }
+                    return this.sanitizeInput(name);
+                    
+                case 'phone':
+                    const phone = input.toString().trim();
+                    // פורמט ישראלי מחמיר
+                    if (!/^0(5[0-9]|2[0-9]|3[0-9]|4[0-9]|7[0-9]|8[0-9]|9[0-9])-?\d{7}$/.test(phone)) {
+                        throw new Error('מספר טלפון ישראלי לא תקין');
+                    }
+                    return phone;
+                    
+                case 'amount':
+                    const amountStr = input.toString().trim();
+                    if (!/^\d+$/.test(amountStr)) {
+                        throw new Error('כמות חייבת להכיל רק ספרות');
+                    }
+                    const amount = parseInt(amountStr);
+                    if (isNaN(amount) || amount < 1 || amount > 10000) {
+                        throw new Error('כמות חייבת להיות בין 1 ל-10000 ליטר');
+                    }
+                    return amount;
+                    
+                case 'fuelType':
+                    const fuel = input.toString().trim();
+                    const allowedFuels = ['בנזין', 'דיזל', 'גז', 'חשמל', 'היברידי'];
+                    if (!allowedFuels.includes(fuel)) {
+                        throw new Error('סוג דלק לא תקין - בחר: בנזין, דיזל, גז, חשמל, היברידי');
+                    }
+                    return fuel;
+                    
+                case 'gadudNumber':
+                    const gadud = input.toString().trim();
+                    const allowedGaduds = ['650', '651', '652', '653', '674', '703', '638', '791', 'admin'];
+                    if (gadud && !allowedGaduds.includes(gadud)) {
+                        throw new Error('מספר גדוד לא תקין');
+                    }
+                    return gadud;
+                    
+                default:
+                    return this.sanitizeInput(input.toString().trim());
             }
         }
         
-        return input.toString().trim();
+        return input;
+    }
+
+    // ניקוי וחיטוי קלטים
+    sanitizeInput(input) {
+        if (!input) return '';
+        
+        return input.toString()
+            .replace(/[<>\"'&]/g, '') // הסרת תווים מסוכנים
+            .replace(/javascript:/gi, '') // הסרת JavaScript
+            .replace(/on\w+=/gi, '') // הסרת event handlers
+            .replace(/<script/gi, '') // הסרת script tags
+            .replace(/<iframe/gi, '') // הסרת iframe tags
+            .replace(/<object/gi, '') // הסרת object tags
+            .replace(/<embed/gi, '') // הסרת embed tags
+            .replace(/<link/gi, '') // הסרת link tags
+            .replace(/<meta/gi, '') // הסרת meta tags
+            .trim();
+    }
+
+    // הגנה מפני XSS
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // בדיקת הגבלת קצב בקשות
+    checkRateLimit(userId = 'anonymous') {
+        const now = Date.now();
+        const userRequests = this.rateLimiter.requests.get(userId) || [];
+        
+        // ניקוי בקשות ישנות
+        const validRequests = userRequests.filter(time => now - time < this.rateLimiter.windowMs);
+        
+        // בדיקת מקסימום בקשות
+        if (validRequests.length >= this.rateLimiter.maxRequests) {
+            throw new Error('יותר מדי בקשות - נסה שוב בעוד דקה');
+        }
+        
+        // הוספת בקשה נוכחית
+        validRequests.push(now);
+        this.rateLimiter.requests.set(userId, validRequests);
+        
+        return true;
+    }
+
+    // בדיקת אבטחה כללית
+    securityCheck(action, data = {}) {
+        try {
+            // בדיקת קצב בקשות
+            const userId = this.currentUser?.name || 'anonymous';
+            this.checkRateLimit(userId);
+            
+            // בדיקת הרשאות
+            if (!this.currentUser) {
+                throw new Error('נדרשת התחברות');
+            }
+            
+            // בדיקת נתונים חשודים
+            const suspiciousPatterns = [
+                /<script/i,
+                /javascript:/i,
+                /on\w+=/i,
+                /eval\(/i,
+                /function\s*\(/i,
+                /document\./i,
+                /window\./i
+            ];
+            
+            const dataString = JSON.stringify(data);
+            for (const pattern of suspiciousPatterns) {
+                if (pattern.test(dataString)) {
+                    this.logError('Security Violation', new Error(`Suspicious pattern detected: ${pattern}`));
+                    throw new Error('נתונים חשודים זוהו');
+                }
+            }
+            
+            return true;
+        } catch (error) {
+            this.logError('Security Check Failed', error);
+            throw error;
+        }
     }
 
     // אתחול מערכת זיהוי דיבור
@@ -508,6 +649,9 @@ class FuelCardManager {
     // הוספת כרטיס חדש
     async addNewCard(command) {
         try {
+            // בדיקת אבטחה
+            this.securityCheck('addNewCard', command);
+            
             // בדיקת הרשאות - רק מנהל יכול לנפק כרטיסים
             if (!this.currentUser || !this.currentUser.isAdmin) {
                 this.showStatus('אין לך הרשאה לנפק כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
@@ -572,11 +716,15 @@ class FuelCardManager {
 
     // עדכון כרטיס קיים
     async updateCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול לעדכן כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לעדכן כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
+        try {
+            // בדיקת אבטחה
+            this.securityCheck('updateCard', command);
+            
+            // בדיקת הרשאות - רק מנהל יכול לעדכן כרטיסים
+            if (!this.currentUser || !this.currentUser.isAdmin) {
+                this.showStatus('אין לך הרשאה לעדכן כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+                return;
+            }
         
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
         
@@ -596,11 +744,15 @@ class FuelCardManager {
 
     // החזרת כרטיס
     async returnCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול להחזיר כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה להחזיר כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
+        try {
+            // בדיקת אבטחה
+            this.securityCheck('returnCard', command);
+            
+            // בדיקת הרשאות - רק מנהל יכול להחזיר כרטיסים
+            if (!this.currentUser || !this.currentUser.isAdmin) {
+                this.showStatus('אין לך הרשאה להחזיר כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+                return;
+            }
         
         const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
         
@@ -616,6 +768,11 @@ class FuelCardManager {
         await this.saveDataToFirebase();
         this.renderTable();
         this.showStatus('כרטיס הוחזר בהצלחה', 'success');
+        
+        } catch (error) {
+            this.logError('Return Card', error);
+            this.showStatus('שגיאה בהחזרת הכרטיס: ' + error.message, 'error');
+        }
     }
 
     // העברת כרטיס לאדם אחר
@@ -781,39 +938,56 @@ class FuelCardManager {
         return true; // כל המשתמשים יכולים לראות את כל העמודות
     }
 
-    // קבלת ערך תא
+    // קבלת ערך תא עם הגנה מפני XSS
     getCellValue(card, column) {
+        let value = '';
         switch(column.id) {
             case 'cardNumber':
-                return card.cardNumber || '';
+                value = card.cardNumber || '';
+                break;
             case 'name':
-                return card.name || '';
+                value = card.name || '';
+                break;
             case 'phone':
-                return card.phone || '';
+                value = card.phone || '';
+                break;
             case 'amount':
-                return card.amount || '';
+                value = card.amount || '';
+                break;
             case 'fuelType':
-                return card.fuelType || '';
+                value = card.fuelType || '';
+                break;
             case 'gadudNumber':
-                return card.gadudNumber || '';
+                value = card.gadudNumber || '';
+                break;
             case 'status':
-                return this.getStatusText(card.status);
+                value = this.getStatusText(card.status);
+                break;
             case 'date':
-                return card.date || '';
+                value = card.date || '';
+                break;
             case 'currentHolder':
-                return card.currentHolderName || 'לא זמין';
+                value = card.currentHolderName || 'לא זמין';
+                break;
             case 'cardChain':
-                return this.getCardChainText(card.cardChain);
+                value = this.getCardChainText(card.cardChain);
+                break;
             case 'gadudName':
-                return card.gadudName || '';
+                value = card.gadudName || '';
+                break;
             case 'gadudId':
-                return card.gadudId || '';
+                value = card.gadudId || '';
+                break;
             case 'remainingFuel':
-                return card.remainingFuel || card.amount || '';
+                value = card.remainingFuel || card.amount || '';
+                break;
             default:
                 // עמודות מותאמות אישית
-                return card[column.id] || '';
+                value = card[column.id] || '';
         }
+        
+        // הגנה מפני XSS - escape HTML
+        return this.escapeHtml(value.toString());
     }
 
     // קבלת טקסט שרשרת הכרטיס
@@ -1277,24 +1451,50 @@ class FuelCardManager {
     }
 
     login() {
-        const name = document.getElementById('loginName').value;
-        const gadud = document.getElementById('loginGadud').value;
-        
-        if (!name || !gadud) {
-            this.showLoginStatus('יש למלא את כל השדות', 'error');
-            return;
-        }
-        
-        const user = {
-            name: name.trim(),
-            gadud: gadud,
-            isAdmin: gadud === 'admin',
-            loginTime: new Date().toLocaleString('he-IL')
-        };
-        
+        try {
+            const name = document.getElementById('loginName').value;
+            const gadud = document.getElementById('loginGadud').value;
+            
+            // בדיקת אבטחה
+            this.securityCheck('login', { name, gadud });
+            
+            if (!name || !gadud) {
+                this.showLoginStatus('יש למלא את כל השדות', 'error');
+                return;
+            }
+            
+            // ולידציה מחמירה
+            const validatedName = this.validateInput(name, 'name');
+            const validatedGadud = this.validateInput(gadud, 'gadudNumber');
+            
+            const user = {
+                name: validatedName,
+                gadud: validatedGadud,
+                isAdmin: validatedGadud === 'admin',
+                loginTime: new Date().toLocaleString('he-IL'),
+                sessionId: this.generateSessionId()
+            };
+            
             this.setCurrentUser(user);
             this.showMainInterface();
             this.showStatus(`ברוך הבא ${user.name}!`, 'success');
+            
+            // לוג התחברות
+            this.logError('User Login', { 
+                user: user.name, 
+                gadud: user.gadud, 
+                timestamp: user.loginTime 
+            });
+            
+        } catch (error) {
+            this.logError('Login Failed', error);
+            this.showLoginStatus('שגיאה בהתחברות: ' + error.message, 'error');
+        }
+    }
+
+    // יצירת מזהה session ייחודי
+    generateSessionId() {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     showLoginStatus(message, type) {
