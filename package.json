@@ -5,7 +5,9 @@
   "main": "index.html",
   "scripts": {
     "start": "python -m http.server 8000",
-    "serve": "npx http-server -p 8000 -o"
+    "serve": "npx http-server -p 8000 -o",
+    "deploy": "firebase deploy --only hosting",
+    "deploy:hosting": "firebase deploy --only hosting"
   },
   "keywords": [
     "fuel",

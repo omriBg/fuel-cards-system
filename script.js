@@ -725,21 +725,26 @@ class FuelCardManager {
                 this.showStatus('אין לך הרשאה לעדכן כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
                 return;
             }
-        
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
+            
+            const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
+            
+            if (cardIndex === -1) {
+                this.showStatus('כרטיס לא נמצא במערכת', 'error');
+                return;
+            }
+            
+            this.fuelCards[cardIndex].amount = command.amount;
+            this.fuelCards[cardIndex].status = 'updated';
+            this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+            
+            await this.saveDataToFirebase();
+            this.renderTable();
+            this.showStatus('כרטיס עודכן בהצלחה', 'success');
+            
+        } catch (error) {
+            this.logError('Update Card', error);
+            this.showStatus('שגיאה בעדכון הכרטיס: ' + error.message, 'error');
         }
-        
-        this.fuelCards[cardIndex].amount = command.amount;
-        this.fuelCards[cardIndex].status = 'updated';
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
-        
-        await this.saveDataToFirebase();
-        this.renderTable();
-        this.showStatus('כרטיס עודכן בהצלחה', 'success');
     }
 
     // החזרת כרטיס
@@ -753,22 +758,22 @@ class FuelCardManager {
                 this.showStatus('אין לך הרשאה להחזיר כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
                 return;
             }
-        
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-        
-        this.fuelCards[cardIndex].amount = 0;
-        this.fuelCards[cardIndex].status = 'returned';
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
-        
-        await this.saveDataToFirebase();
-        this.renderTable();
-        this.showStatus('כרטיס הוחזר בהצלחה', 'success');
-        
+            
+            const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === parseInt(command.cardNumber));
+            
+            if (cardIndex === -1) {
+                this.showStatus('כרטיס לא נמצא במערכת', 'error');
+                return;
+            }
+            
+            this.fuelCards[cardIndex].amount = 0;
+            this.fuelCards[cardIndex].status = 'returned';
+            this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+            
+            await this.saveDataToFirebase();
+            this.renderTable();
+            this.showStatus('כרטיס הוחזר בהצלחה', 'success');
+            
         } catch (error) {
             this.logError('Return Card', error);
             this.showStatus('שגיאה בהחזרת הכרטיס: ' + error.message, 'error');
