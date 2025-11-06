@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Collection: fuelCards
+    match /fuelCards/{cardId} {
+      // קריאה - רק משתמשים מורשים (כרגע כולם, אבל אפשר להגביל)
+      allow read: if true;
+      
+      // כתיבה - רק משתמשים מורשים
+      // הערה: כרגע אין Firebase Authentication, אז זה פתוח
+      // מומלץ להוסיף Firebase Authentication בעתיד
+      allow write: if true;
+      
+      // בעתיד, אחרי הוספת Authentication:
+      // allow read: if request.auth != null;
+      // allow write: if request.auth != null && 
+      //   (request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType']));
+    }
+    
+    // Collection אחרות - חסום
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

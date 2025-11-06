@@ -20,7 +20,7 @@
     
     <!-- Additional Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
+    <!-- X-Frame-Options removed - should be set via HTTP headers, not meta tag -->
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <style>
@@ -399,14 +399,21 @@
             box-shadow: 0 5px 15px rgba(149, 165, 166, 0.4);
         }
 
-        /* סגנונות מסך פתיחה - עיצוב קלאסי ואיכותי */
+        /* סגנונות מסך פתיחה - עיצוב אגד הטנ"א */
         .splash-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            background: linear-gradient(180deg, #4a90e2 0%, #2c5aa0 50%, #1a3d7a 100%);
+            background-image: 
+                linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
+                linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.1) 75%),
+                linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.1) 75%);
+            background-size: 60px 60px;
+            background-position: 0 0, 0 30px, 30px -30px, -30px 0px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -416,8 +423,8 @@
 
         .splash-content {
             text-align: center;
-            color: #ecf0f1;
-            max-width: 600px;
+            color: #ffffff;
+            max-width: 800px;
             padding: 40px;
             animation: slideUp 1s ease-out;
         }
@@ -426,101 +433,129 @@
             margin-bottom: 40px;
         }
 
+        .logo-image {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 30px;
+            display: block;
+            animation: subtleFloat 3s ease-in-out infinite;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+        }
+
         .logo-icon {
             font-size: 4em;
             margin-bottom: 20px;
-            color: #bdc3c7;
+            color: #ffffff;
             animation: subtleFloat 3s ease-in-out infinite;
+            display: none; /* נסתיר אם יש לוגו */
         }
 
         .splash-title {
-            font-size: 2.5em;
-            margin-bottom: 15px;
-            font-weight: 300;
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
             color: #ffffff;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             animation: titleFadeIn 1.5s ease-out 0.5s both;
         }
 
         .splash-subtitle {
-            font-size: 1.1em;
-            opacity: 0.8;
-            margin-bottom: 0;
-            color: #bdc3c7;
-            font-weight: 300;
+            font-size: 1.3em;
+            margin-bottom: 5px;
+            color: #ffffff;
+            font-weight: 600;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            animation: titleFadeIn 1.5s ease-out 0.6s both;
+        }
+
+        .splash-subtitle-2 {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+            color: #ffffff;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: titleFadeIn 1.5s ease-out 0.7s both;
         }
 
         .splash-info {
-            margin: 40px 0;
-            padding: 25px;
-            background: rgba(52, 73, 94, 0.3);
-            border-radius: 8px;
-            border: 1px solid rgba(189, 195, 199, 0.2);
+            margin: 50px 0;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
             animation: infoSlideIn 1.2s ease-out 0.8s both;
         }
 
         .unit-info h2 {
-            font-size: 1.4em;
-            margin-bottom: 20px;
-            color: #ecf0f1;
-            font-weight: 400;
-            letter-spacing: 0.5px;
+            font-size: 1.6em;
+            margin-bottom: 15px;
+            color: #ffffff;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
         }
 
         .unit-details {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
         }
 
         .unit-name {
-            font-size: 1.2em;
+            font-size: 1.3em;
             font-weight: 500;
-            color: #bdc3c7;
-            letter-spacing: 0.3px;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .developer-name {
-            font-size: 1.4em;
-            font-weight: 600;
+            font-size: 1.5em;
+            font-weight: 700;
             color: #ffffff;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             animation: nameFadeIn 1.8s ease-out 1s both;
         }
 
         .unit-badge {
-            font-size: 1em;
-            background: #34495e;
-            color: #ecf0f1;
-            padding: 8px 16px;
-            border-radius: 4px;
+            font-size: 1.1em;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 8px;
             display: inline-block;
             margin: 0 auto;
-            font-weight: 500;
-            border: 1px solid #5d6d7e;
-            letter-spacing: 0.3px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .splash-loading {
-            margin-top: 30px;
+            margin-top: 40px;
             animation: loadingSlideIn 1.5s ease-out 1.2s both;
         }
 
         .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(189, 195, 199, 0.3);
-            border-top: 3px solid #ecf0f1;
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
             border-radius: 50%;
             animation: spin 1.2s linear infinite;
-            margin: 0 auto 15px;
+            margin: 0 auto 20px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
         }
 
         .splash-loading p {
-            font-size: 0.9em;
-            opacity: 0.7;
-            color: #bdc3c7;
-            font-weight: 300;
+            font-size: 1.1em;
+            opacity: 0.9;
+            color: #ffffff;
+            font-weight: 500;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         /* אנימציות עדינות וקלאסיות */
@@ -620,19 +655,16 @@
     <div id="splashScreen" class="splash-screen">
         <div class="splash-content">
             <div class="splash-logo">
-                <div class="logo-icon">⛽</div>
-                <h1 class="splash-title">מערכת ניהול כרטיסי דלק</h1>
-                <p class="splash-subtitle">הקלטה קולית חכמה לניהול כרטיסי דלק</p>
+                <img src="logo.png" alt="אגד הטנ״א" class="logo-image" id="splashLogo" onerror="this.style.display='none'; document.querySelector('.logo-icon').style.display='block';">
+                <div class="logo-icon" style="display: none;">⛽</div>
+                <h1 class="splash-title">אגד הטנ״א,</h1>
+                <p class="splash-subtitle">מניעים את</p>
+                <p class="splash-subtitle-2">הצבא קדימה!</p>
             </div>
             
             <div class="splash-info">
                 <div class="unit-info">
-                    <h2>פותח על ידי</h2>
-                    <div class="unit-details">
-                        <div class="unit-name">היחידה של הקל״ח</div>
-                        <div class="developer-name">ירין ראובן</div>
-                        <div class="unit-badge">אגד תנע</div>
-                    </div>
+                    <h2>פותח על ידי הקל״ח</h2>
                 </div>
             </div>
             
@@ -1011,7 +1043,17 @@
         window.firebaseQuery = query;
         window.firebaseWhere = where;
         window.firebaseOrderBy = orderBy;
+        
+        // ודא ש-Firebase מוכן לפני טעינת script.js
+        console.log('Firebase initialized, loading script.js...');
+        window.firebaseReady = true;
+        
+        // טען את script.js רק אחרי ש-Firebase מוכן
+        const script = document.createElement('script');
+        script.src = 'script.js';
+        script.type = 'text/javascript';
+        script.async = false;
+        document.body.appendChild(script);
     </script>
-    <script src="script.js"></script>
 </body>
 </html>

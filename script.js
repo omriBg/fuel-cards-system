@@ -203,8 +203,8 @@ class FuelCardManager {
             const userId = this.currentUser?.name || 'anonymous';
             this.checkRateLimit(userId);
             
-            // בדיקת הרשאות
-            if (!this.currentUser) {
+            // בדיקת הרשאות - רק אם זה לא פעולת התחברות
+            if (action !== 'login' && !this.currentUser) {
                 throw new Error('נדרשת התחברות');
             }
             
@@ -668,11 +668,29 @@ class FuelCardManager {
                 gadudNumber: command.gadudNumber || ''
             };
             
-            // בדיקה שהכרטיס לא קיים
+            // בדיקה שהכרטיס לא קיים (בצד הלקוח)
             const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === validatedCommand.cardNumber);
             if (existingIndex !== -1) {
                 this.showStatus('כרטיס כבר קיים במערכת', 'error');
                 return;
+            }
+            
+            // בדיקה שהכרטיס לא קיים ב-Firebase (בצד השרת)
+            try {
+                const querySnapshot = await window.firebaseGetDocs(
+                    window.firebaseQuery(
+                        window.firebaseCollection(window.db, 'fuelCards'),
+                        window.firebaseWhere('cardNumber', '==', parseInt(validatedCommand.cardNumber))
+                    )
+                );
+                
+                if (!querySnapshot.empty) {
+                    this.showStatus('כרטיס כבר קיים במערכת', 'error');
+                    return;
+                }
+            } catch (error) {
+                console.error('שגיאה בבדיקת כרטיס קיים ב-Firebase:', error);
+                // אם יש שגיאה, נמשיך (לא נחסום את המשתמש)
             }
             
             // אם זה מהקלטה קולית ולא מהטופס, נציג טופס בחירת גדוד
@@ -702,8 +720,14 @@ class FuelCardManager {
                 currentHolderName: 'מערכת'
             };
             
+            // הוסף ישירות ל-Firebase (לא דרך saveDataToFirebase)
+            await window.firebaseAddDoc(
+                window.firebaseCollection(window.db, 'fuelCards'),
+                newCard
+            );
+            
+            // עדכן את המערך המקומי
             this.fuelCards.push(newCard);
-            await this.saveDataToFirebase();
             this.renderTable();
             this.showStatus('כרטיס חדש נוסף בהצלחה', 'success');
             
@@ -1078,24 +1102,80 @@ class FuelCardManager {
         }
     }
 
-    // שמירת נתונים ל-Firebase
+    // שמירת נתונים ל-Firebase - יעיל (מעדכן רק מה שהשתנה)
     async saveDataToFirebase() {
         try {
             console.log('שומר נתונים ל-Firebase...');
-            // נמחק את כל המסמכים הקיימים
+            
+            // טען את כל הכרטיסים הקיימים ב-Firebase
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
-            const deletePromises = querySnapshot.docs.map(doc => 
-                window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
-            );
-            await Promise.all(deletePromises);
             
-            // נוסיף את כל הכרטיסים מחדש
-            const addPromises = this.fuelCards.map(card => 
-                window.firebaseAddDoc(window.firebaseCollection(window.db, 'fuelCards'), card)
-            );
-            await Promise.all(addPromises);
+            // צור מפה של cardNumber -> Firebase document ID
+            const firebaseCardsMap = new Map();
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                firebaseCardsMap.set(data.cardNumber, { id: doc.id, data: data });
+            });
             
-            console.log('נתונים נשמרו ל-Firebase בהצלחה');
+            // צור מפה של cardNumber -> כרטיס מקומי
+            const localCardsMap = new Map();
+            this.fuelCards.forEach(card => {
+                localCardsMap.set(card.cardNumber, card);
+            });
+            
+            // פעולות לעדכון
+            const addPromises = [];
+            const updatePromises = [];
+            const deletePromises = [];
+            
+            // עבור על כל הכרטיסים המקומיים
+            for (const card of this.fuelCards) {
+                const firebaseCard = firebaseCardsMap.get(card.cardNumber);
+                
+                if (firebaseCard) {
+                    // כרטיס קיים - בדוק אם השתנה
+                    const hasChanged = JSON.stringify(card) !== JSON.stringify(firebaseCard.data);
+                    if (hasChanged) {
+                        // עדכן רק אם השתנה
+                        updatePromises.push(
+                            window.firebaseUpdateDoc(
+                                window.firebaseDoc(window.db, 'fuelCards', firebaseCard.id),
+                                card
+                            )
+                        );
+                    }
+                } else {
+                    // כרטיס חדש - הוסף
+                    addPromises.push(
+                        window.firebaseAddDoc(
+                            window.firebaseCollection(window.db, 'fuelCards'),
+                            card
+                        )
+                    );
+                }
+            }
+            
+            // מצא כרטיסים שנמחקו (יש ב-Firebase אבל לא מקומיים)
+            for (const [cardNumber, firebaseCard] of firebaseCardsMap.entries()) {
+                if (!localCardsMap.has(cardNumber)) {
+                    deletePromises.push(
+                        window.firebaseDeleteDoc(
+                            window.firebaseDoc(window.db, 'fuelCards', firebaseCard.id)
+                        )
+                    );
+                }
+            }
+            
+            // בצע את כל הפעולות
+            await Promise.all([...addPromises, ...updatePromises, ...deletePromises]);
+            
+            const stats = {
+                added: addPromises.length,
+                updated: updatePromises.length,
+                deleted: deletePromises.length
+            };
+            
+            console.log(`נתונים נשמרו ל-Firebase בהצלחה: ${stats.added} נוספו, ${stats.updated} עודכנו, ${stats.deleted} נמחקו`);
         } catch (error) {
             console.error('שגיאה בשמירת נתונים ל-Firebase:', error);
             this.showStatus('שגיאה בשמירת נתונים', 'error');
@@ -1457,7 +1537,7 @@ class FuelCardManager {
 
     login() {
         try {
-            const name = document.getElementById('loginName').value;
+            const name = document.getElementById('loginName').value.trim();
             const gadud = document.getElementById('loginGadud').value;
             
             // בדיקת אבטחה
@@ -1468,14 +1548,41 @@ class FuelCardManager {
                 return;
             }
             
-            // ולידציה מחמירה
-            const validatedName = this.validateInput(name, 'name');
-            const validatedGadud = this.validateInput(gadud, 'gadudNumber');
+            // בדיקת משתמשים מורשים
+            let isAuthorized = false;
+            let isAdmin = false;
+            let validatedGadud = gadud;
+            
+            // משתמש מורשה: 650 עם גדוד 650
+            if (name === '650' && gadud === '650') {
+                isAuthorized = true;
+                validatedGadud = '650';
+            }
+            // משתמש מורשה: 9526 עם מנהל מערכת
+            else if (name === '9526' && (gadud === 'admin' || gadud === 'מנהל מערכת')) {
+                isAuthorized = true;
+                isAdmin = true;
+                validatedGadud = 'admin';
+            }
+            
+            if (!isAuthorized) {
+                this.showLoginStatus('שם משתמש או גדוד לא מורשים', 'error');
+                return;
+            }
+            
+            // ולידציה מחמירה - רק אם המשתמש מורשה
+            let validatedName;
+            try {
+                validatedName = this.validateInput(name, 'name');
+            } catch (e) {
+                // אם ולידציה נכשלה, אבל המשתמש מורשה, נשתמש בשם המקורי
+                validatedName = name;
+            }
             
             const user = {
                 name: validatedName,
                 gadud: validatedGadud,
-                isAdmin: validatedGadud === 'admin',
+                isAdmin: isAdmin,
                 loginTime: new Date().toLocaleString('he-IL'),
                 sessionId: this.generateSessionId()
             };
@@ -1484,8 +1591,8 @@ class FuelCardManager {
             this.showMainInterface();
             this.showStatus(`ברוך הבא ${user.name}!`, 'success');
             
-            // לוג התחברות
-            this.logError('User Login', { 
+            // לוג התחברות (ללא שגיאה)
+            console.log('User Login:', { 
                 user: user.name, 
                 gadud: user.gadud, 
                 timestamp: user.loginTime 
@@ -1874,12 +1981,19 @@ class FuelCardManager {
     }
 }
 
-// אתחול המערכת
+// אתחול המערכת - רק אחרי ש-DOM מוכן
 console.log('מתחיל לטעון את המערכת...');
 let fuelCardManager;
 
 async function initializeSystem() {
     try {
+        // חכה ש-DOM מוכן
+        if (document.readyState === 'loading') {
+            await new Promise(resolve => {
+                document.addEventListener('DOMContentLoaded', resolve);
+            });
+        }
+        
         fuelCardManager = new FuelCardManager();
         await fuelCardManager.initialize();
         window.fuelCardManager = fuelCardManager;
@@ -1890,7 +2004,11 @@ async function initializeSystem() {
 }
 
 // התחל את האתחול
-initializeSystem();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeSystem);
+} else {
+    initializeSystem();
+}
 
 // פונקציות גלובליות
 function startRecording(action) {

@@ -197,3 +197,4 @@ firebase login --reauth
 2. ודא שהקובץ `index.html` קיים
 3. ודא שאתה מחובר: `firebase login`
 
+

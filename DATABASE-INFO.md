@@ -203,3 +203,4 @@ await window.firebaseAddDoc(
 
 **הערה**: כל הנתונים שלך נמצאים ב-Firebase של Google, מוגנים ובטוחים! 🔒
 
+
