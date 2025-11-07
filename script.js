@@ -80,12 +80,12 @@ class FuelCardManager {
             switch (type) {
                 case 'cardNumber':
                     const cardStr = input.toString().trim();
-                    if (!/^\d{7,8}$/.test(cardStr)) {
-                        throw new Error('מספר רכב חייב להכיל 7 או 8 ספרות בלבד');
+                    if (!/^\d{1,6}$/.test(cardStr)) {
+                        throw new Error('מספר כרטיס חייב להכיל רק ספרות (1-6 ספרות)');
                     }
                     const cardNum = parseInt(cardStr);
-                    if (cardNum < 1000000 || cardNum > 99999999) {
-                        throw new Error('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)');
+                    if (cardNum < 1 || cardNum > 999999) {
+                        throw new Error('מספר כרטיס חייב להיות בין 1 ל-999999');
                     }
                     return cardNum;
                     

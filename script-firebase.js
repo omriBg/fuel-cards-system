@@ -1244,22 +1244,10 @@ function submitNewCard() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
-    const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
-        return;
-    }
-    const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
-        return;
-    }
-    
     // יצירת פקודה
     const command = {
         type: 'new',
-        cardNumber: cardNum,
+        cardNumber: parseInt(cardNumber),
         name: name.trim(),
         phone: phone.trim(),
         amount: parseInt(amount),
@@ -1294,22 +1282,10 @@ function submitUpdateCard() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
-    const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
-        return;
-    }
-    const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
-        return;
-    }
-    
     // יצירת פקודה
     const command = {
         type: 'update',
-        cardNumber: cardNum,
+        cardNumber: parseInt(cardNumber),
         amount: parseInt(amount)
     };
     
@@ -1339,22 +1315,10 @@ function submitReturnCard() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
-    const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
-        return;
-    }
-    const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
-        return;
-    }
-    
     // יצירת פקודה
     const command = {
         type: 'return',
-        cardNumber: cardNum,
+        cardNumber: parseInt(cardNumber),
         creditDate: creditDate
     };
     
