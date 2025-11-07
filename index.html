@@ -664,7 +664,7 @@
             
             <div class="splash-info">
                 <div class="unit-info">
-                    <h2>פותח על ידי הקל״ח</h2>
+                    <h2>פותח ע״י מדור לוגיסטיקה אגד טנא ארצי</h2>
                 </div>
             </div>
             
@@ -680,7 +680,7 @@
             <h1>מערכת ניהול כרטיסי דלק</h1>
             <p>הקלטה קולית חכמה לניהול כרטיסי דלק</p>
             <div class="developer-credit">
-                <span>פותח על ידי הקל״ח ירין ראובן</span>
+                <span>פותח ע״י מדור לוגיסטיקה אגד טנא ארצי</span>
             </div>
             <div id="userInfo" style="margin-top: 15px; display: none;">
                 <span id="currentUserInfo"></span>
@@ -818,14 +818,18 @@
                 <select id="newGadudNumber" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                     <option value="">בחר מספר גדוד</option>
                     <option value="650">650</option>
+                    <option value="703">703</option>
                     <option value="651">651</option>
+                    <option value="791">791</option>
                     <option value="652">652</option>
+                    <option value="638">638</option>
                     <option value="653">653</option>
                     <option value="674">674</option>
-                    <option value="703">703</option>
-                    <option value="638">638</option>
-                    <option value="791">791</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label for="newIssueDate">תאריך ניפוק:</label>
+                <input type="date" id="newIssueDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
                 <button class="submit-btn" onclick="submitNewCard()">הוסף כרטיס</button>
@@ -857,6 +861,10 @@
                 <label for="returnCardNumber">מספר כרטיס:</label>
                 <input type="number" id="returnCardNumber" placeholder="הכנס מספר כרטיס">
             </div>
+            <div class="form-group">
+                <label for="returnCreditDate">תאריך זיכוי:</label>
+                <input type="date" id="returnCreditDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
+            </div>
             <div class="form-buttons">
                 <button class="submit-btn" onclick="submitReturnCard()">החזר כרטיס</button>
                 <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
@@ -879,8 +887,8 @@
                 <input type="text" id="gadudId" placeholder="הכנס מספר אישי">
             </div>
             <div class="form-group">
-                <label for="gadudRemainingFuel">כמות דלק שנשאר (ניפוק גדודי):</label>
-                <input type="number" id="gadudRemainingFuel" placeholder="הכנס כמות דלק שנשאר">
+                <label for="gadudIssueDate">תאריך ניפוק גדודי:</label>
+                <input type="date" id="gadudIssueDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
                 <button class="submit-btn" onclick="submitGadudNew()">הוסף ניפוק גדודי</button>
@@ -919,6 +927,10 @@
             <div class="form-group">
                 <label for="gadudReturnCardNumber">מספר כרטיס:</label>
                 <input type="number" id="gadudReturnCardNumber" placeholder="הכנס מספר כרטיס">
+            </div>
+            <div class="form-group">
+                <label for="gadudCreditDate">תאריך זיכוי גדודי:</label>
+                <input type="date" id="gadudCreditDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
                 <button class="submit-btn" onclick="submitGadudReturn()">זיכוי גדודי</button>
@@ -965,7 +977,7 @@
             ">
                 <h2 style="color: #2c3e50; margin-bottom: 30px;">התחברות למערכת</h2>
                 <div style="margin-bottom: 20px;">
-                    <input type="text" id="loginName" placeholder="שם מלא" style="
+                    <input type="text" id="loginName" placeholder="סיסמה סודית" style="
                         width: 100%;
                         padding: 12px;
                         border: 2px solid #ddd;
@@ -983,14 +995,14 @@
                         font-size: 16px;
                     ">
                         <option value="">בחר גדוד</option>
-                        <option value="650">גדוד 650</option>
+                        <option value="650">מפקדת אגד 650</option>
+                        <option value="703">גדוד 703</option>
                         <option value="651">גדוד 651</option>
+                        <option value="791">יחידה 791</option>
                         <option value="652">גדוד 652</option>
+                        <option value="638">גדוד 638</option>
                         <option value="653">גדוד 653</option>
                         <option value="674">גדוד 674</option>
-                        <option value="703">גדוד 703</option>
-                        <option value="638">גדוד 638</option>
-                        <option value="791">גדוד 791</option>
                         <option value="admin">מנהל מערכת</option>
                     </select>
                 </div>

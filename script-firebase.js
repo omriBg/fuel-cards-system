@@ -312,6 +312,7 @@ class FuelCardManager {
             amount: command.amount,
             fuelType: command.fuelType,
             gadudNumber: command.gadudNumber || '',
+            issueDate: command.issueDate || new Date().toISOString().split('T')[0],
             status: 'new',
             date: new Date().toLocaleString('he-IL'),
             // שרשרת העברת כרטיס
@@ -380,6 +381,9 @@ class FuelCardManager {
         
         this.fuelCards[cardIndex].status = 'returned';
         this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        // שמירת תאריך זיכוי
+        const creditDate = command.creditDate || new Date().toISOString().split('T')[0];
+        this.fuelCards[cardIndex].creditDate = creditDate;
         
         // הוסף לשרשרת העברת כרטיס
         this.fuelCards[cardIndex].cardChain.push({
@@ -405,12 +409,16 @@ class FuelCardManager {
                 { id: 'phone', name: 'טלפון', type: 'text', editable: true, department: 'all' },
                 { id: 'amount', name: 'כמות (ליטר)', type: 'number', editable: true, department: 'all' },
                 { id: 'fuelType', name: 'סוג דלק', type: 'text', editable: true, department: 'all' },
-                { id: 'gadudNumber', name: 'מספר גדוד', type: 'select', editable: true, department: 'all', options: ['650', '651', '652', '653', '674', '703', '638', '791'] },
+                { id: 'gadudNumber', name: 'מספר גדוד', type: 'select', editable: true, department: 'all', options: ['650', '703', '651', '791', '652', '638', '653', '674'] },
+                { id: 'issueDate', name: 'תאריך ניפוק', type: 'date', editable: true, department: 'all' },
+                { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
                 { id: 'status', name: 'סטטוס', type: 'text', editable: false, department: 'all' },
                 { id: 'date', name: 'תאריך', type: 'text', editable: false, department: 'all' },
                 { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
                 { id: 'gadudId', name: 'מספר אישי (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
-                { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' }
+                { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
+                { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
+                { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
             ];
             this.saveTableColumns(defaultColumns);
             return defaultColumns;
@@ -419,10 +427,14 @@ class FuelCardManager {
         // אם יש עמודות קיימות, נבדוק אם צריך להוסיף את העמודות החדשות
         const existingColumns = JSON.parse(columns);
         const newColumns = [
-            { id: 'gadudNumber', name: 'מספר גדוד', type: 'select', editable: true, department: 'all', options: ['650', '651', '652', '653', '674', '703', '638', '791'] },
+            { id: 'gadudNumber', name: 'מספר גדוד', type: 'select', editable: true, department: 'all', options: ['650', '703', '651', '791', '652', '638', '653', '674'] },
+            { id: 'issueDate', name: 'תאריך ניפוק', type: 'date', editable: true, department: 'all' },
+            { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
             { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
             { id: 'gadudId', name: 'מספר אישי (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
-            { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' }
+            { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
+            { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
+            { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
         ];
         
         // הוסף עמודות חדשות אם הן לא קיימות
@@ -608,7 +620,7 @@ class FuelCardManager {
     }
 
     // הוספת נתונים גדודיים לכרטיס
-    async addGadudData(cardNumber, gadudName, gadudId, remainingFuel) {
+    async addGadudData(cardNumber, gadudName, gadudId, remainingFuel, gadudIssueDate) {
         // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
         if (!this.currentUser || this.currentUser.isAdmin) {
             this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
@@ -630,7 +642,10 @@ class FuelCardManager {
 
         this.fuelCards[cardIndex].gadudName = gadudName;
         this.fuelCards[cardIndex].gadudId = gadudId;
-        this.fuelCards[cardIndex].remainingFuel = remainingFuel;
+        if (typeof remainingFuel !== 'undefined') {
+            this.fuelCards[cardIndex].remainingFuel = remainingFuel;
+        }
+        this.fuelCards[cardIndex].gadudIssueDate = gadudIssueDate || new Date().toISOString().split('T')[0];
         this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
 
         await this.saveDataToFirebase();
@@ -670,7 +685,7 @@ class FuelCardManager {
     }
 
     // מחיקת נתונים גדודיים מכרטיס (זיכוי גדודי)
-    async clearGadudData(cardNumber) {
+    async clearGadudData(cardNumber, gadudCreditDate) {
         // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
         if (!this.currentUser || this.currentUser.isAdmin) {
             this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
@@ -693,6 +708,7 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudName = '';
         this.fuelCards[cardIndex].gadudId = '';
         this.fuelCards[cardIndex].remainingFuel = '';
+        this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || new Date().toISOString().split('T')[0];
         this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
 
         await this.saveDataToFirebase();
@@ -744,7 +760,7 @@ class FuelCardManager {
     }
 
     login() {
-        const name = document.getElementById('loginName').value;
+        const name = document.getElementById('loginName').value.trim();
         const gadud = document.getElementById('loginGadud').value;
         
         if (!name || !gadud) {
@@ -752,16 +768,50 @@ class FuelCardManager {
             return;
         }
         
+        // בדיקת משתמשים מורשים - סיסמאות ייחודיות לכל גדוד
+        let isAuthorized = false;
+        let isAdmin = false;
+        let validatedGadud = gadud;
+        
+        // הגדרת סיסמאות ייחודיות לכל גדוד
+        const gadudPasswords = {
+            '650': '9526',        // מפקדת אגד 650 - נשאר כפי שנדרש
+            '703': 'Zt7$Qp!9',    // גדוד 703
+            '651': 'Lm3@Rg#5',    // גדוד 651
+            '791': 'Vy8%Tc^2',    // יחידה 791
+            '652': 'Hd4&Ns*7',    // גדוד 652
+            '638': 'Pf1)Wb=6',    // גדוד 638
+            '653': 'Qk5+Xe?8',    // גדוד 653
+            '674': 'Jr9!Lu$4'     // גדוד 674
+        };
+        
+        // בדיקת סיסמה לפי הגדוד שנבחר
+        if (gadudPasswords[gadud] && name === gadudPasswords[gadud]) {
+            isAuthorized = true;
+            validatedGadud = gadud;
+        }
+        // משתמש מורשה: 9526 עם מנהל מערכת
+        else if (name === '9526' && (gadud === 'admin' || gadud === 'מנהל מערכת')) {
+            isAuthorized = true;
+            isAdmin = true;
+            validatedGadud = 'admin';
+        }
+        
+        if (!isAuthorized) {
+            this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
+            return;
+        }
+        
         const user = {
-            name: name.trim(),
-            gadud: gadud,
-            isAdmin: gadud === 'admin',
+            name: name,
+            gadud: validatedGadud,
+            isAdmin: isAdmin,
             loginTime: new Date().toLocaleString('he-IL')
         };
         
         this.setCurrentUser(user);
         this.showMainInterface();
-        this.showStatus(`ברוך הבא ${user.name}!`, 'success');
+        this.showStatus(`ברוך הבא!`, 'success');
     }
 
     showLoginStatus(message, type) {
@@ -915,13 +965,13 @@ class FuelCardManager {
                         ">
                             <option value="">בחר מספר גדוד (אופציונלי)</option>
                             <option value="650">650</option>
+                            <option value="703">703</option>
                             <option value="651">651</option>
+                            <option value="791">791</option>
                             <option value="652">652</option>
+                            <option value="638">638</option>
                             <option value="653">653</option>
                             <option value="674">674</option>
-                            <option value="703">703</option>
-                            <option value="638">638</option>
-                            <option value="791">791</option>
                         </select>
                     </div>
                     <div style="display: flex; gap: 15px; justify-content: center;">
@@ -1186,6 +1236,7 @@ function submitNewCard() {
     const amount = document.getElementById('newAmount').value;
     const fuelType = document.getElementById('newFuelType').value;
     const gadudNumber = document.getElementById('newGadudNumber').value;
+    const issueDate = document.getElementById('newIssueDate').value || new Date().toISOString().split('T')[0];
     
     // בדיקת שדות חובה
     if (!cardNumber || !name || !phone || !amount || !fuelType) {
@@ -1193,15 +1244,28 @@ function submitNewCard() {
         return;
     }
     
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+        return;
+    }
+    
     // יצירת פקודה
     const command = {
         type: 'new',
-        cardNumber: parseInt(cardNumber),
+        cardNumber: cardNum,
         name: name.trim(),
         phone: phone.trim(),
         amount: parseInt(amount),
         fuelType: fuelType.trim(),
-        gadudNumber: gadudNumber || ''
+        gadudNumber: gadudNumber || '',
+        issueDate: issueDate
     };
     
     console.log('פקודה נוצרה:', command);
@@ -1230,10 +1294,22 @@ function submitUpdateCard() {
         return;
     }
     
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+        return;
+    }
+    
     // יצירת פקודה
     const command = {
         type: 'update',
-        cardNumber: parseInt(cardNumber),
+        cardNumber: cardNum,
         amount: parseInt(amount)
     };
     
@@ -1255,6 +1331,7 @@ function submitReturnCard() {
     console.log('שולח טופס החזרת כרטיס');
     
     const cardNumber = document.getElementById('returnCardNumber').value;
+    const creditDate = document.getElementById('returnCreditDate').value || new Date().toISOString().split('T')[0];
     
     // בדיקת שדה חובה
     if (!cardNumber) {
@@ -1262,10 +1339,23 @@ function submitReturnCard() {
         return;
     }
     
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+        return;
+    }
+    
     // יצירת פקודה
     const command = {
         type: 'return',
-        cardNumber: parseInt(cardNumber)
+        cardNumber: cardNum,
+        creditDate: creditDate
     };
     
     console.log('פקודה נוצרה:', command);
@@ -1309,17 +1399,29 @@ function submitGadudNew() {
     const cardNumber = document.getElementById('gadudCardNumber').value;
     const gadudName = document.getElementById('gadudName').value;
     const gadudId = document.getElementById('gadudId').value;
-    const remainingFuel = document.getElementById('gadudRemainingFuel').value;
+    const gadudIssueDate = document.getElementById('gadudIssueDate').value || new Date().toISOString().split('T')[0];
     
     // בדיקת שדות חובה
-    if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
+    if (!cardNumber || !gadudName || !gadudId) {
         fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
+        return;
+    }
+    
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
         return;
     }
     
     // ביצוע הפעולה
     try {
-        fuelCardManager.addGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
+        fuelCardManager.addGadudData(cardNum, gadudName, gadudId, undefined, gadudIssueDate);
         hideTypingForm();
         clearGadudNewForm();
     } catch (error) {
@@ -1343,9 +1445,21 @@ function submitGadudUpdate() {
         return;
     }
     
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+        return;
+    }
+    
     // ביצוע הפעולה
     try {
-        fuelCardManager.updateGadudData(parseInt(cardNumber), gadudName, gadudId, parseInt(remainingFuel));
+        fuelCardManager.updateGadudData(cardNum, gadudName, gadudId, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudUpdateForm();
     } catch (error) {
@@ -1359,6 +1473,7 @@ function submitGadudReturn() {
     console.log('שולח טופס זיכוי גדודי');
     
     const cardNumber = document.getElementById('gadudReturnCardNumber').value;
+    const gadudCreditDate = document.getElementById('gadudCreditDate').value || new Date().toISOString().split('T')[0];
     
     // בדיקת שדה חובה
     if (!cardNumber) {
@@ -1366,9 +1481,21 @@ function submitGadudReturn() {
         return;
     }
     
+    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    const cardNumStr = cardNumber.toString().trim();
+    if (!/^\d{7,8}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+        return;
+    }
+    const cardNum = parseInt(cardNumStr);
+    if (cardNum < 1000000 || cardNum > 99999999) {
+        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+        return;
+    }
+    
     // ביצוע הפעולה
     try {
-        fuelCardManager.clearGadudData(parseInt(cardNumber));
+        fuelCardManager.clearGadudData(cardNum, gadudCreditDate);
         hideTypingForm();
         clearGadudReturnForm();
     } catch (error) {
@@ -1382,7 +1509,6 @@ function clearGadudNewForm() {
     document.getElementById('gadudCardNumber').value = '';
     document.getElementById('gadudName').value = '';
     document.getElementById('gadudId').value = '';
-    document.getElementById('gadudRemainingFuel').value = '';
 }
 
 // ניקוי טופס עדכון גדודי
