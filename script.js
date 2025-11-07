@@ -2127,19 +2127,10 @@ function submitNewCard() {
             return;
         }
 
-        // ולידציה של מספר רכב (7 או 8 ספרות)
-        let validatedCardNumber;
-        try {
-            validatedCardNumber = window.fuelCardManager.validateInput(cardNumber, 'cardNumber');
-        } catch (validationError) {
-            window.fuelCardManager.showStatus(validationError.message, 'error');
-            return;
-        }
-        
         // יצירת פקודה
         const command = {
             type: 'new',
-            cardNumber: validatedCardNumber,
+            cardNumber: cardNumber,
             name: name,
             phone: phone,
             amount: amount,
@@ -2184,19 +2175,10 @@ function submitUpdateCard() {
             return;
         }
 
-        // ולידציה של מספר רכב (7 או 8 ספרות)
-        let validatedCardNumber;
-        try {
-            validatedCardNumber = window.fuelCardManager.validateInput(cardNumber, 'cardNumber');
-        } catch (validationError) {
-            window.fuelCardManager.showStatus(validationError.message, 'error');
-            return;
-        }
-        
         // יצירת פקודה
         const command = {
             type: 'update',
-            cardNumber: validatedCardNumber,
+            cardNumber: cardNumber,
             amount: amount
         };
         
@@ -2236,19 +2218,10 @@ function submitReturnCard() {
             return;
         }
 
-        // ולידציה של מספר רכב (7 או 8 ספרות)
-        let validatedCardNumber;
-        try {
-            validatedCardNumber = window.fuelCardManager.validateInput(cardNumber, 'cardNumber');
-        } catch (validationError) {
-            window.fuelCardManager.showStatus(validationError.message, 'error');
-            return;
-        }
-        
         // יצירת פקודה
         const command = {
             type: 'return',
-            cardNumber: validatedCardNumber,
+            cardNumber: cardNumber,
             creditDate: creditDate
         };
         
