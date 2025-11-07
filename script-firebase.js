@@ -15,6 +15,17 @@ class FuelCardManager {
         console.log('המערכת מוכנה לשימוש!');
     }
 
+    formatDateTime(value) {
+        const options = { dateStyle: 'short', timeStyle: 'short' };
+        if (value) {
+            const parsed = new Date(value);
+            if (!isNaN(parsed.getTime())) {
+                return parsed.toLocaleString('he-IL', options);
+            }
+        }
+        return new Date().toLocaleString('he-IL', options);
+    }
+
     // טעינת נתונים מ-Firebase
     async loadDataFromFirebase() {
         try {
@@ -305,6 +316,8 @@ class FuelCardManager {
             return;
         }
         
+        const issueDate = command.issueDate || this.formatDateTime();
+
         const newCard = {
             cardNumber: command.cardNumber,
             name: command.name,
@@ -312,14 +325,14 @@ class FuelCardManager {
             amount: command.amount,
             fuelType: command.fuelType,
             gadudNumber: command.gadudNumber || '',
-            issueDate: command.issueDate || new Date().toISOString().split('T')[0],
+            issueDate: issueDate,
             status: 'new',
-            date: new Date().toLocaleString('he-IL'),
+            date: issueDate,
             // שרשרת העברת כרטיס
             cardChain: [{
                 action: 'ניפוק ראשוני',
                 amount: command.amount,
-                date: new Date().toLocaleString('he-IL'),
+                date: issueDate,
                 status: 'active'
             }],
             currentHolder: 'system',
@@ -349,13 +362,13 @@ class FuelCardManager {
         
         this.fuelCards[cardIndex].amount = command.amount;
         this.fuelCards[cardIndex].status = 'updated';
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        this.fuelCards[cardIndex].date = this.formatDateTime();
         
         // הוסף לשרשרת העברת כרטיס
         this.fuelCards[cardIndex].cardChain.push({
             action: 'עדכון כמות',
             amount: command.amount,
-            date: new Date().toLocaleString('he-IL'),
+            date: this.formatDateTime(),
             status: 'active'
         });
         
@@ -380,16 +393,16 @@ class FuelCardManager {
         }
         
         this.fuelCards[cardIndex].status = 'returned';
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        this.fuelCards[cardIndex].date = this.formatDateTime();
         // שמירת תאריך זיכוי
-        const creditDate = command.creditDate || new Date().toISOString().split('T')[0];
+        const creditDate = command.creditDate || this.formatDateTime();
         this.fuelCards[cardIndex].creditDate = creditDate;
         
         // הוסף לשרשרת העברת כרטיס
         this.fuelCards[cardIndex].cardChain.push({
             action: 'החזרת כרטיס',
             amount: this.fuelCards[cardIndex].amount,
-            date: new Date().toLocaleString('he-IL'),
+            date: this.formatDateTime(),
             status: 'returned'
         });
         
@@ -645,8 +658,8 @@ class FuelCardManager {
         if (typeof remainingFuel !== 'undefined') {
             this.fuelCards[cardIndex].remainingFuel = remainingFuel;
         }
-        this.fuelCards[cardIndex].gadudIssueDate = gadudIssueDate || new Date().toISOString().split('T')[0];
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        this.fuelCards[cardIndex].gadudIssueDate = gadudIssueDate || this.formatDateTime();
+        this.fuelCards[cardIndex].date = this.formatDateTime();
 
         await this.saveDataToFirebase();
         this.renderTable();
@@ -677,7 +690,7 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudName = gadudName;
         this.fuelCards[cardIndex].gadudId = gadudId;
         this.fuelCards[cardIndex].remainingFuel = remainingFuel;
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        this.fuelCards[cardIndex].date = this.formatDateTime();
 
         await this.saveDataToFirebase();
         this.renderTable();
@@ -708,8 +721,8 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudName = '';
         this.fuelCards[cardIndex].gadudId = '';
         this.fuelCards[cardIndex].remainingFuel = '';
-        this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || new Date().toISOString().split('T')[0];
-        this.fuelCards[cardIndex].date = new Date().toLocaleString('he-IL');
+        this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
+        this.fuelCards[cardIndex].date = this.formatDateTime();
 
         await this.saveDataToFirebase();
         this.renderTable();
@@ -1236,7 +1249,8 @@ function submitNewCard() {
     const amount = document.getElementById('newAmount').value;
     const fuelType = document.getElementById('newFuelType').value;
     const gadudNumber = document.getElementById('newGadudNumber').value;
-    const issueDate = document.getElementById('newIssueDate').value || new Date().toISOString().split('T')[0];
+    const issueDateInput = document.getElementById('newIssueDate').value;
+    const issueDate = fuelCardManager.formatDateTime(issueDateInput);
     
     // בדיקת שדות חובה
     if (!cardNumber || !name || !phone || !amount || !fuelType) {
@@ -1307,7 +1321,8 @@ function submitReturnCard() {
     console.log('שולח טופס החזרת כרטיס');
     
     const cardNumber = document.getElementById('returnCardNumber').value;
-    const creditDate = document.getElementById('returnCreditDate').value || new Date().toISOString().split('T')[0];
+    const creditDateInput = document.getElementById('returnCreditDate').value;
+    const creditDate = fuelCardManager.formatDateTime(creditDateInput);
     
     // בדיקת שדה חובה
     if (!cardNumber) {
@@ -1343,6 +1358,10 @@ function clearNewCardForm() {
     document.getElementById('newAmount').value = '';
     document.getElementById('newFuelType').value = '';
     document.getElementById('newGadudNumber').value = '';
+    const issueDateField = document.getElementById('newIssueDate');
+    if (issueDateField) {
+        issueDateField.value = '';
+    }
 }
 
 // ניקוי טופס עדכון כרטיס
@@ -1354,6 +1373,10 @@ function clearUpdateCardForm() {
 // ניקוי טופס החזרת כרטיס
 function clearReturnCardForm() {
     document.getElementById('returnCardNumber').value = '';
+    const creditDateField = document.getElementById('returnCreditDate');
+    if (creditDateField) {
+        creditDateField.value = '';
+    }
 }
 
 // שליחת טופס ניפוק גדודי
@@ -1363,7 +1386,8 @@ function submitGadudNew() {
     const cardNumber = document.getElementById('gadudCardNumber').value;
     const gadudName = document.getElementById('gadudName').value;
     const gadudId = document.getElementById('gadudId').value;
-    const gadudIssueDate = document.getElementById('gadudIssueDate').value || new Date().toISOString().split('T')[0];
+    const gadudIssueDateInput = document.getElementById('gadudIssueDate').value;
+    const gadudIssueDate = fuelCardManager.formatDateTime(gadudIssueDateInput);
     
     // בדיקת שדות חובה
     if (!cardNumber || !gadudName || !gadudId) {
@@ -1437,7 +1461,8 @@ function submitGadudReturn() {
     console.log('שולח טופס זיכוי גדודי');
     
     const cardNumber = document.getElementById('gadudReturnCardNumber').value;
-    const gadudCreditDate = document.getElementById('gadudCreditDate').value || new Date().toISOString().split('T')[0];
+    const gadudCreditDateInput = document.getElementById('gadudCreditDate').value;
+    const gadudCreditDate = fuelCardManager.formatDateTime(gadudCreditDateInput);
     
     // בדיקת שדה חובה
     if (!cardNumber) {
@@ -1473,6 +1498,10 @@ function clearGadudNewForm() {
     document.getElementById('gadudCardNumber').value = '';
     document.getElementById('gadudName').value = '';
     document.getElementById('gadudId').value = '';
+    const issueDateField = document.getElementById('gadudIssueDate');
+    if (issueDateField) {
+        issueDateField.value = '';
+    }
 }
 
 // ניקוי טופס עדכון גדודי
@@ -1486,6 +1515,10 @@ function clearGadudUpdateForm() {
 // ניקוי טופס זיכוי גדודי
 function clearGadudReturnForm() {
     document.getElementById('gadudReturnCardNumber').value = '';
+    const creditDateField = document.getElementById('gadudCreditDate');
+    if (creditDateField) {
+        creditDateField.value = '';
+    }
 }
 
 // הצגת הוראות קוליות
