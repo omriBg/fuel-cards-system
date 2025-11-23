@@ -3437,7 +3437,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // תמיכה במקלדת לטופסי גדוד
-        const gadudInputs = ['gadudCardNumber', 'gadudName', 'gadudId'];
+        const gadudInputs = ['gadudCardNumber', 'gadudName'];
         gadudInputs.forEach(inputId => {
             const input = document.getElementById(inputId);
             if (input) {
