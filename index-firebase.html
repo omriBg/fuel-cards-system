@@ -167,6 +167,291 @@
             animation: pulse 1.5s infinite;
         }
 
+        .fuel-type-selector {
+            margin-top: 10px;
+        }
+
+        .fuel-type-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .fuel-type-option {
+            flex: 1;
+            min-width: 120px;
+            border: 1px solid #3d6b1f;
+            background: #fff;
+            color: #3d6b1f;
+            border-radius: 6px;
+            padding: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fuel-type-option:hover {
+            background: #f1f8e9;
+        }
+
+        .fuel-type-option.active {
+            background: #3d6b1f;
+            color: #fff;
+            box-shadow: 0 6px 12px rgba(61, 107, 31, 0.3);
+        }
+
+        .fuel-type-custom {
+            display: none;
+        }
+
+        .fuel-type-custom.visible {
+            display: block;
+        }
+
+        .status-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .status-modal--visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .status-modal--hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .status-modal__dialog {
+            background: #ffffff;
+            border-radius: 12px;
+            width: min(420px, 100%);
+            padding: 24px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.25);
+            direction: rtl;
+            text-align: right;
+            transform: translateY(-20px);
+            transition: transform 0.2s ease;
+        }
+
+        .status-modal--visible .status-modal__dialog {
+            transform: translateY(0);
+        }
+
+        .status-modal__icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+
+        .status-modal[data-status-type="success"] .status-modal__icon {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-modal[data-status-type="error"] .status-modal__icon {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .status-modal[data-status-type="recording"] .status-modal__icon,
+        .status-modal[data-status-type="processing"] .status-modal__icon {
+            background: #e3f2fd;
+            color: #0d47a1;
+        }
+
+        .status-modal__title {
+            margin: 0 0 8px;
+            font-size: 1.2em;
+            color: #2d5016;
+        }
+
+        .status-modal__message {
+            margin: 0 0 20px;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+
+        .status-modal__actions {
+            display: flex;
+            justify-content: flex-start;
+            gap: 12px;
+        }
+
+        .status-modal__action,
+        .status-modal__close {
+            border: none;
+            border-radius: 6px;
+            padding: 10px 18px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-weight: 600;
+        }
+
+        .status-modal__action {
+            background: #3d6b1f;
+            color: #ffffff;
+        }
+
+        .status-modal__action:hover {
+            background: #2d5016;
+        }
+
+        .status-modal__close {
+            background: transparent;
+            color: #3d6b1f;
+            padding: 0;
+            margin-left: auto;
+            font-size: 1em;
+        }
+
+        @media (max-width: 600px) {
+            .status-modal {
+                padding: 16px;
+            }
+
+            .status-modal__dialog {
+                width: 100%;
+            }
+        }
+
+        .amount-selector {
+            margin-top: 10px;
+        }
+
+        .amount-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .amount-option {
+            flex: 1;
+            min-width: 120px;
+            border: 1px solid #3d6b1f;
+            background: #fff;
+            color: #3d6b1f;
+            border-radius: 6px;
+            padding: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .amount-option:hover {
+            background: #f1f8e9;
+        }
+
+        .amount-option.active {
+            background: #3d6b1f;
+            color: #fff;
+            box-shadow: 0 6px 12px rgba(61, 107, 31, 0.3);
+        }
+
+        .amount-custom {
+            display: none;
+        }
+
+        .amount-custom.visible {
+            display: block;
+        }
+
+        .bulk-issue {
+            border: 1px dashed #3d6b1f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            background: #f4f8ef;
+            display: none;
+        }
+
+        .bulk-issue--active {
+            border-style: solid;
+            background: #e6f4d6;
+        }
+
+        .bulk-issue__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .bulk-issue__header h5 {
+            margin: 0;
+            font-size: 1em;
+            color: #2d5016;
+        }
+
+        .bulk-issue__status {
+            font-weight: 600;
+            color: #a93226;
+        }
+
+        .bulk-issue--active .bulk-issue__status {
+            color: #1b5e20;
+        }
+
+        .bulk-issue__hint {
+            margin: 0 0 12px;
+            font-size: 0.9em;
+            color: #4e5d46;
+        }
+
+        .bulk-issue__actions {
+           	display: flex;
+           	gap: 10px;
+           	flex-wrap: wrap;
+        }
+
+        .bulk-issue__actions .bulk-btn {
+            flex: 1;
+            min-width: 140px;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .bulk-btn.primary {
+            background: #2b6d1f;
+            color: #fff;
+        }
+
+        .bulk-btn.primary:hover {
+            background: #1f4d16;
+        }
+
+        .bulk-btn.secondary {
+            background: #f1f1f1;
+            color: #2d2d2d;
+        }
+
+        .bulk-btn.secondary:hover {
+            background: #e0e0e0;
+        }
+
         .data-table {
             background: white;
             border-radius: 15px;
@@ -231,6 +516,17 @@
 
         .row-returned {
             background-color: #f8d7da;
+        }
+
+        .clickable-remaining-fuel {
+            background-color: #fff9c4 !important;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
+        .clickable-remaining-fuel:hover {
+            background-color: #fff59d !important;
+            text-decoration: underline;
         }
 
         .typing-form {
@@ -390,6 +686,39 @@
         </div>
 
         <div id="status" class="status"></div>
+        <div
+            id="statusModal"
+            class="status-modal status-modal--hidden"
+            role="alertdialog"
+            aria-live="assertive"
+            aria-labelledby="statusModalTitle"
+            aria-describedby="statusModalMessage"
+            aria-hidden="true"
+            onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+        >
+            <div class="status-modal__dialog" onclick="event.stopPropagation();">
+                <button
+                    type="button"
+                    class="status-modal__close"
+                    aria-label="סגור הודעה"
+                    onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+                >
+                    X
+                </button>
+                <div id="statusModalIcon" class="status-modal__icon">ℹ</div>
+                <h3 id="statusModalTitle" class="status-modal__title">עדכון מערכת</h3>
+                <p id="statusModalMessage" class="status-modal__message"></p>
+                <div class="status-modal__actions">
+                    <button
+                        type="button"
+                        class="status-modal__action"
+                        onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+                    >
+                        הבנתי
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div class="button-grid">
             <button class="action-btn" onclick="startRecording('new')">
@@ -425,6 +754,20 @@
         <div id="newCardForm" class="typing-form">
             <h4>ניפוק כרטיס חדש</h4>
             <div class="form-group">
+                <label for="newGadudNumber">מספר גדוד:</label>
+                <select id="newGadudNumber" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
+                    <option value="">בחר מספר גדוד</option>
+                    <option value="650">650</option>
+                    <option value="703">703</option>
+                    <option value="651">651</option>
+                    <option value="791">791</option>
+                    <option value="652">652</option>
+                    <option value="638">638</option>
+                    <option value="653">653</option>
+                    <option value="674">674</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="newCardNumber">מספר כרטיס:</label>
                 <input type="number" id="newCardNumber" placeholder="הכנס מספר כרטיס">
             </div>
@@ -438,25 +781,42 @@
             </div>
             <div class="form-group">
                 <label for="newAmount">כמות ליטר:</label>
-                <input type="number" id="newAmount" placeholder="הכנס כמות ליטר">
+                <div class="amount-selector" data-amount-selector="newAmount">
+                    <div class="amount-buttons">
+                        <button type="button" class="amount-option" data-amount-value="50" onclick="selectAmount('newAmount', 50, this)">50 ליטר</button>
+                        <button type="button" class="amount-option" data-amount-value="100" onclick="selectAmount('newAmount', 100, this)">100 ליטר</button>
+                        <button type="button" class="amount-option" data-amount-value="other" onclick="selectAmount('newAmount', 'other', this)">אחר</button>
+                    </div>
+                    <div class="amount-custom">
+                        <input type="number" id="newAmount" placeholder="הקלד כמות ליטר" min="1" oninput="handleCustomAmountInput('newAmount')">
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="newFuelType">סוג דלק:</label>
-                <input type="text" id="newFuelType" placeholder="הכנס סוג דלק (בנזין/דיזל)">
+                <div class="fuel-type-selector" data-fuel-selector="newFuelType">
+                    <div class="fuel-type-buttons">
+                        <button type="button" class="fuel-type-option" data-fuel-value="בנזין" onclick="selectFuelType('newFuelType', 'בנזין', this)">בנזין</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="סולר" onclick="selectFuelType('newFuelType', 'סולר', this)">סולר</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="other" onclick="selectFuelType('newFuelType', 'other', this)">אחר</button>
+                    </div>
+                    <div class="fuel-type-custom">
+                        <input type="text" id="newFuelType" placeholder="הקלד סוג דלק" oninput="handleCustomFuelInput('newFuelType')">
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="newGadudNumber">מספר גדוד:</label>
-                <select id="newGadudNumber" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
-                    <option value="">בחר מספר גדוד</option>
-                    <option value="650">650</option>
-                    <option value="703">703</option>
-                    <option value="651">651</option>
-                    <option value="791">791</option>
-                    <option value="652">652</option>
-                    <option value="638">638</option>
-                    <option value="653">653</option>
-                    <option value="674">674</option>
-                </select>
+            <div id="bulkIssueControls" class="bulk-issue">
+                <div class="bulk-issue__header">
+                    <h5>מקבץ ניפוק (מנהל מערכת)</h5>
+                    <span id="bulkIssueStatus" class="bulk-issue__status">כבוי</span>
+                </div>
+                <p class="bulk-issue__hint">
+                    במצב מקבץ, שם, טלפון ומספר גדוד נשמרים לניפוקים נוספים עבור אותו גורם.
+                </p>
+                <div class="bulk-issue__actions">
+                    <button type="button" class="bulk-btn primary" onclick="activateBulkIssue()">שמור מקבץ</button>
+                    <button type="button" class="bulk-btn secondary" onclick="deactivateBulkIssue()">בטל מקבץ</button>
+                </div>
             </div>
             <div class="form-group">
                 <label for="newIssueDate">תאריך ושעת ניפוק:</label>

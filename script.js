@@ -9,6 +9,23 @@ class FuelCardManager {
         this.currentUser = this.getCurrentUser();
         this.errors = [];
         this.isInitialized = false;
+        this.statusModalTimeout = null;
+        this.handleStatusModalKeydown = this.handleStatusModalKeydown.bind(this);
+        this.bulkIssue = {
+            active: false,
+            data: null
+        };
+        this.adminGadudContacts = {
+            '651': { name: 'דור בן לולו', phone: '054-3091641' },
+            '652': { name: 'לי נאגר', phone: '050-5559153' },
+            '653': { name: 'אביחי', phone: '050-6909403' },
+            '638': { name: 'מירב עדן בניאס', phone: '052-6889285' },
+            '674': { name: 'נועה אסולין', phone: '052-7891707' },
+            '703': { name: 'תאיר בנימיני', phone: '052-2030798' },
+            '791': { name: 'סהר דניאל', phone: '052-9202202' }
+        };
+        document.addEventListener('keydown', this.handleStatusModalKeydown);
+        this.setupGadudAutoFillHandler();
         
         // מערכת הגבלת קצב בקשות
         this.rateLimiter = {
@@ -33,10 +50,37 @@ class FuelCardManager {
         return new Date().toLocaleString('he-IL', options);
     }
 
+    // ניסיון התחברות ל-Firebase Authentication (Anonymous)
+    async attemptAnonymousAuth() {
+        try {
+            if (window.auth && window.signInAnonymously) {
+                // בדיקה אם המשתמש כבר מחובר
+                if (window.auth.currentUser) {
+                    console.log('משתמש כבר מחובר:', window.auth.currentUser.uid);
+                    return true;
+                }
+                
+                // ניסיון התחברות אנונימית
+                const userCredential = await window.signInAnonymously(window.auth);
+                console.log('התחברות אנונימית הצליחה:', userCredential.user.uid);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            // אם יש שגיאה, נמשיך בלי authentication (הכללים מאפשרים זאת)
+            console.warn('שגיאה בהתחברות אנונימית (המערכת תמשיך לעבוד):', error.message);
+            return false;
+        }
+    }
+
     async initialize() {
         try {
             this.initSpeechRecognition();
             this.checkLogin();
+            
+            // ניסיון התחברות ל-Firebase Authentication לפני טעינת נתונים
+            await this.attemptAnonymousAuth();
+            
             await this.loadDataFromFirebase();
             this.isInitialized = true;
             console.log('המערכת מוכנה לשימוש!');
@@ -91,12 +135,12 @@ class FuelCardManager {
             switch (type) {
                 case 'cardNumber':
                     const cardStr = input.toString().trim();
-                    if (!/^\d{1,6}$/.test(cardStr)) {
-                        throw new Error('מספר כרטיס חייב להכיל רק ספרות (1-6 ספרות)');
+                    if (!/^\d{4,12}$/.test(cardStr)) {
+                        throw new Error('מספר כרטיס חייב להכיל רק ספרות (4-12 ספרות)');
                     }
                     const cardNum = parseInt(cardStr);
-                    if (cardNum < 1 || cardNum > 999999) {
-                        throw new Error('מספר כרטיס חייב להיות בין 1 ל-999999');
+                    if (cardNum < 1000 || cardNum > 999999999999) {
+                        throw new Error('מספר כרטיס חייב להיות בין 1000 ל-999999999999');
                     }
                     return cardNum;
                     
@@ -689,6 +733,9 @@ class FuelCardManager {
             
             // בדיקה שהכרטיס לא קיים ב-Firebase (בצד השרת)
             try {
+                // ניסיון התחברות אנונימית לפני בדיקה
+                await this.attemptAnonymousAuth();
+                
                 const querySnapshot = await window.firebaseGetDocs(
                     window.firebaseQuery(
                         window.firebaseCollection(window.db, 'fuelCards'),
@@ -732,6 +779,9 @@ class FuelCardManager {
                 currentHolder: 'system',
                 currentHolderName: 'מערכת'
             };
+            
+            // ניסיון התחברות אנונימית לפני הוספה
+            await this.attemptAnonymousAuth();
             
             // הוסף ישירות ל-Firebase (לא דרך saveDataToFirebase)
             await window.firebaseAddDoc(
@@ -916,13 +966,198 @@ class FuelCardManager {
     // הצגת סטטוס
     showStatus(message, type) {
         const statusDiv = document.getElementById('status');
-        statusDiv.textContent = message;
-        statusDiv.className = `status ${type}`;
-        statusDiv.style.display = 'block';
-        
-        setTimeout(() => {
-            statusDiv.style.display = 'none';
-        }, 3000);
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        this.openStatusModal(message, type);
+    }
+
+    openStatusModal(message, type = 'info') {
+        const modal = document.getElementById('statusModal');
+        const messageEl = document.getElementById('statusModalMessage');
+        const titleEl = document.getElementById('statusModalTitle');
+        const iconEl = document.getElementById('statusModalIcon');
+
+        if (!modal || !messageEl) {
+            return;
+        }
+
+        const titles = {
+            success: 'הפעולה הצליחה',
+            error: 'פעולה נכשלה',
+            recording: 'מקליט...',
+            processing: 'מעבד בקשה',
+            info: 'עדכון מערכת'
+        };
+
+        const icons = {
+            success: '✓',
+            error: '!',
+            recording: '●',
+            processing: '…',
+            info: 'ℹ'
+        };
+
+        const statusType = titles[type] ? type : 'info';
+        if (titleEl) {
+            titleEl.textContent = titles[statusType];
+        }
+        if (iconEl) {
+            iconEl.textContent = icons[statusType];
+        }
+        messageEl.textContent = message;
+
+        modal.setAttribute('data-status-type', statusType);
+        modal.classList.remove('status-modal--hidden');
+        modal.classList.add('status-modal--visible');
+        modal.setAttribute('aria-hidden', 'false');
+
+        if (this.statusModalTimeout) {
+            clearTimeout(this.statusModalTimeout);
+        }
+
+        // השאר הודעות שגיאה על המסך עד לסגירה ידנית
+        if (statusType !== 'error') {
+            this.statusModalTimeout = setTimeout(() => {
+                this.closeStatusModal();
+            }, 4500);
+        }
+    }
+
+    closeStatusModal() {
+        const modal = document.getElementById('statusModal');
+        if (!modal) {
+            return;
+        }
+
+        modal.classList.remove('status-modal--visible');
+        modal.classList.add('status-modal--hidden');
+        modal.setAttribute('aria-hidden', 'true');
+
+        if (this.statusModalTimeout) {
+            clearTimeout(this.statusModalTimeout);
+            this.statusModalTimeout = null;
+        }
+    }
+
+    handleStatusModalKeydown(event) {
+        if (event.key === 'Escape') {
+            this.closeStatusModal();
+        }
+    }
+
+    enableBulkIssue(data) {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            return;
+        }
+        this.bulkIssue.active = true;
+        this.bulkIssue.data = { ...data };
+        this.applyBulkIssueDataToForm();
+        this.updateBulkIssueUI();
+        this.showStatus('מצב מקבץ הופעל - אפשר להנפיק מספר כרטיסים לאותו גורם', 'success');
+    }
+
+    disableBulkIssue(showMessage = true) {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            return;
+        }
+        this.bulkIssue.active = false;
+        this.bulkIssue.data = null;
+        this.updateBulkIssueUI();
+        if (showMessage) {
+            this.showStatus('מצב מקבץ בוטל', 'info');
+        }
+    }
+
+    isBulkIssueActive() {
+        return !!(this.currentUser && this.currentUser.isAdmin && this.bulkIssue.active && this.bulkIssue.data);
+    }
+
+    applyBulkIssueDataToForm() {
+        if (!this.isBulkIssueActive()) {
+            return;
+        }
+        const { name, phone, gadudNumber } = this.bulkIssue.data;
+        const nameInput = document.getElementById('newName');
+        const phoneInput = document.getElementById('newPhone');
+        const gadudSelect = document.getElementById('newGadudNumber');
+
+        if (nameInput) nameInput.value = name || '';
+        if (phoneInput) phoneInput.value = phone || '';
+        if (gadudSelect) gadudSelect.value = gadudNumber || '';
+    }
+
+    updateBulkIssueUI() {
+        const controls = document.getElementById('bulkIssueControls');
+        const statusText = document.getElementById('bulkIssueStatus');
+        if (!controls) {
+            return;
+        }
+
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            controls.style.display = 'none';
+            return;
+        }
+
+        controls.style.display = 'block';
+        if (statusText) {
+            if (this.isBulkIssueActive()) {
+                statusText.textContent = `פעיל (${this.bulkIssue.data.name || ''})`;
+                controls.classList.add('bulk-issue--active');
+            } else {
+                statusText.textContent = 'כבוי';
+                controls.classList.remove('bulk-issue--active');
+            }
+        }
+    }
+
+    clearBulkIssueState() {
+        this.bulkIssue.active = false;
+        this.bulkIssue.data = null;
+        this.updateBulkIssueUI();
+    }
+
+    setupGadudAutoFillHandler() {
+        const gadudSelect = document.getElementById('newGadudNumber');
+        if (!gadudSelect || gadudSelect.dataset.autofillAttached === 'true') {
+            return;
+        }
+        gadudSelect.dataset.autofillAttached = 'true';
+        gadudSelect.addEventListener('change', () => this.handleGadudSelectionChange());
+    }
+
+    handleGadudSelectionChange() {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            return;
+        }
+        if (this.isBulkIssueActive()) {
+            return;
+        }
+        const gadudSelect = document.getElementById('newGadudNumber');
+        if (!gadudSelect) return;
+        const contact = this.adminGadudContacts[gadudSelect.value];
+        if (!contact) {
+            return;
+        }
+        const shouldAutoFill = window.confirm(`האם למלא אוטומטית את שם וטלפון עבור גדוד ${gadudSelect.value}?`);
+        if (!shouldAutoFill) {
+            return;
+        }
+        const nameInput = document.getElementById('newName');
+        const phoneInput = document.getElementById('newPhone');
+        if (nameInput) {
+            nameInput.value = contact.name;
+        }
+        if (phoneInput) {
+            phoneInput.value = contact.phone;
+        }
     }
 
     // רינדור טבלה
@@ -933,18 +1168,52 @@ class FuelCardManager {
         // עדכון כותרות הטבלה
         this.updateTableHeaders();
         
-        // קבל כרטיסים מסוננים לפי הרשאות
-        const filteredCards = this.getFilteredCards();
+        // קבל כרטיסים מסוננים לפי הרשאות וחיפוש
+        const filteredCards = this.getFilteredAndSearchedCards();
+        
+        // בדיקה אם יש חיפוש פעיל
+        const searchInput = document.getElementById('searchInput');
+        const hasSearch = searchInput && searchInput.value.trim();
+        
+        // עדכון סטטיסטיקות
+        this.updateStats(filteredCards);
+        
+        // הצג/הסתר הודעת תוצאות חיפוש
+        const searchResultsInfo = document.getElementById('searchResultsInfo');
+        const searchResultsCount = document.getElementById('searchResultsCount');
+        if (hasSearch && filteredCards.length > 0) {
+            if (searchResultsInfo) searchResultsInfo.style.display = 'block';
+            if (searchResultsCount) searchResultsCount.textContent = filteredCards.length;
+        } else {
+            if (searchResultsInfo) searchResultsInfo.style.display = 'none';
+        }
+        
+        // הצג/הסתר empty state
+        const emptyState = document.getElementById('tableEmptyState');
+        const table = document.getElementById('fuelCardsTable');
+        if (filteredCards.length === 0) {
+            if (emptyState) emptyState.style.display = 'block';
+            if (table) table.style.display = 'none';
+            if (searchResultsInfo) searchResultsInfo.style.display = 'none';
+        } else {
+            if (emptyState) emptyState.style.display = 'none';
+            if (table) table.style.display = 'table';
+        }
         
         filteredCards.forEach(card => {
             const row = document.createElement('tr');
             
             // הוספת מחלקת צבע לפי סטטוס
-            if (card.status === 'new') {
+            // ניפוק/עדכון גדודי - צהוב (אם יש נתונים גדודיים)
+            if (card.gadudName || card.gadudId) {
+                row.classList.add('row-gadud');
+            }
+            // ניפוק רגיל - אדום
+            else if (card.status === 'new') {
                 row.classList.add('row-new');
-            } else if (card.status === 'updated') {
-                row.classList.add('row-updated');
-            } else if (card.status === 'returned') {
+            }
+            // זיכוי רגיל - ירוק
+            else if (card.status === 'returned' || card.status === 'final_return') {
                 row.classList.add('row-returned');
             }
             
@@ -954,13 +1223,76 @@ class FuelCardManager {
                 // בדוק אם המשתמש יכול לראות את העמודה
                 if (this.canViewColumn(column)) {
                     let cellValue = this.getCellValue(card, column);
-                    rowContent += `<td>${cellValue}</td>`;
+                    // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
+                    if (column.id === 'remainingFuel') {
+                        const isClickable = card.gadudName || card.gadudId; // רק אם יש נתונים גדודיים
+                        const clickableClass = isClickable ? 'clickable-remaining-fuel' : '';
+                        const cursorStyle = isClickable ? 'cursor: pointer;' : '';
+                        const title = isClickable ? 'לחץ לזיכוי גדודי (איפוס ל-0)' : '';
+                        rowContent += `<td class="${clickableClass}" style="${cursorStyle}" title="${title}" ${isClickable ? `onclick="window.fuelCardManager.showGadudCreditConfirmation('${card.cardNumber}', '')"` : ''}>${cellValue}</td>`;
+                    } else {
+                        rowContent += `<td>${cellValue}</td>`;
+                    }
                 }
             });
             
             row.innerHTML = rowContent;
             tbody.appendChild(row);
         });
+    }
+    
+    // סינון וחיפוש כרטיסים
+    getFilteredAndSearchedCards() {
+        let cards = this.getFilteredCards();
+        
+        // סינון לפי סטטוס
+        const statusFilter = document.getElementById('statusFilter');
+        if (statusFilter && statusFilter.value === 'not_returned') {
+            // הצג רק כרטיסים שלא זוכו (לא ירוקים)
+            cards = cards.filter(card => {
+                return card.status !== 'returned' && card.status !== 'final_return';
+            });
+        }
+        // אם statusFilter.value === 'all' - הצג הכל (אין צורך לסנן)
+        
+        // חיפוש
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput && searchInput.value.trim()) {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            cards = cards.filter(card => {
+                const cardNumber = (card.cardNumber || '').toString().toLowerCase();
+                const name = (card.name || '').toLowerCase();
+                const phone = (card.phone || '').toLowerCase();
+                return cardNumber.includes(searchTerm) || 
+                       name.includes(searchTerm) || 
+                       phone.includes(searchTerm);
+            });
+        }
+        
+        return cards;
+    }
+    
+    // סינון טבלה לפי חיפוש
+    filterTable() {
+        this.renderTable();
+    }
+    
+    // עדכון סטטיסטיקות
+    updateStats(cards) {
+        const total = cards.length;
+        const active = cards.filter(c => c.status === 'active' || c.status === 'new' || c.status === 'updated').length;
+        const newCards = cards.filter(c => c.status === 'new').length;
+        const returned = cards.filter(c => c.status === 'returned' || c.status === 'final_return').length;
+        
+        const statTotal = document.getElementById('statTotal');
+        const statActive = document.getElementById('statActive');
+        const statNew = document.getElementById('statNew');
+        const statReturned = document.getElementById('statReturned');
+        
+        if (statTotal) statTotal.textContent = total;
+        if (statActive) statActive.textContent = active;
+        if (statNew) statNew.textContent = newCards;
+        if (statReturned) statReturned.textContent = returned;
     }
 
     // עדכון כותרות הטבלה
@@ -1008,8 +1340,8 @@ class FuelCardManager {
             case 'status':
                 value = this.getStatusText(card.status);
                 break;
-            case 'date':
-                value = card.date || '';
+            case 'issueDate':
+                value = card.issueDate || card.date || '';
                 break;
             case 'currentHolder':
                 value = card.currentHolderName || 'לא זמין';
@@ -1089,6 +1421,9 @@ class FuelCardManager {
         try {
             console.log('טוען נתונים מ-Firebase...');
             
+            // הצג loading state
+            this.showLoadingState();
+            
             // בדיקה ש-Firebase נטען
             if (!window.firebaseCollection || !window.db) {
                 console.log('Firebase עדיין לא נטען, מחכה...');
@@ -1096,10 +1431,14 @@ class FuelCardManager {
                 if (!window.firebaseCollection || !window.db) {
                     console.log('Firebase לא נטען, עובר ל-localStorage');
                     this.fuelCards = this.loadData();
+                    this.hideLoadingState();
                     this.renderTable();
                     return;
                 }
             }
+            
+            // ניסיון התחברות אנונימית לפני טעינת נתונים
+            await this.attemptAnonymousAuth();
             
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
             this.fuelCards = [];
@@ -1109,19 +1448,37 @@ class FuelCardManager {
                 this.fuelCards.push(data);
             });
             console.log('כרטיסים נטענו מ-Firebase:', this.fuelCards.length);
+            this.hideLoadingState();
             this.renderTable();
         } catch (error) {
             console.error('שגיאה בטעינת נתונים מ-Firebase:', error);
             console.log('עובר ל-localStorage');
             this.fuelCards = this.loadData();
+            this.hideLoadingState();
             this.renderTable();
         }
+    }
+    
+    // הצגת loading state
+    showLoadingState() {
+        const tbody = document.getElementById('fuelCardsBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="100%" style="text-align: center; padding: 40px; color: #666;">טוען נתונים...</td></tr>';
+        }
+    }
+    
+    // הסתרת loading state
+    hideLoadingState() {
+        // renderTable ידאג לניקוי
     }
 
     // שמירת נתונים ל-Firebase - יעיל (מעדכן רק מה שהשתנה)
     async saveDataToFirebase() {
         try {
             console.log('שומר נתונים ל-Firebase...');
+            
+            // ניסיון התחברות אנונימית לפני שמירה
+            await this.attemptAnonymousAuth();
             
             // טען את כל הכרטיסים הקיימים ב-Firebase
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
@@ -1213,7 +1570,6 @@ class FuelCardManager {
                 { id: 'issueDate', name: 'תאריך ניפוק', type: 'date', editable: true, department: 'all' },
                 { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
                 { id: 'status', name: 'סטטוס', type: 'text', editable: false, department: 'all' },
-                { id: 'date', name: 'תאריך', type: 'text', editable: false, department: 'all' },
                 { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
                 { id: 'gadudId', name: 'מספר אישי (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
                 { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
@@ -1340,7 +1696,7 @@ class FuelCardManager {
 
     // הורדת Excel
     downloadExcel() {
-        const filteredCards = this.getFilteredCards();
+        const filteredCards = this.getFilteredAndSearchedCards();
         
         if (filteredCards.length === 0) {
             this.showStatus('אין נתונים להורדה', 'error');
@@ -1348,7 +1704,7 @@ class FuelCardManager {
         }
         
         // יצירת CSV עם העמודות החדשות
-        let csv = 'מספר כרטיס,שם,טלפון,כמות (ליטר),סוג דלק,מספר גדוד,סטטוס,תאריך,משתמש,שם (ניפוק גדודי),מספר אישי (ניפוק גדודי),כמות דלק שנשאר (ניפוק גדודי)\n';
+        let csv = 'מספר כרטיס,שם,טלפון,כמות (ליטר),סוג דלק,מספר גדוד,סטטוס,תאריך ניפוק,משתמש,שם (ניפוק גדודי),מספר אישי (ניפוק גדודי),כמות דלק שנשאר (ניפוק גדודי)\n';
         
         filteredCards.forEach(card => {
             const userInfo = this.getUserInfo(card).replace(/<br>/g, ' | ');
@@ -1358,7 +1714,7 @@ class FuelCardManager {
             const gadudId = card.gadudId || '';
             const remainingFuel = card.remainingFuel || card.amount || '';
             
-            csv += `${card.cardNumber},${card.name},${card.phone},${card.amount},${card.fuelType},${gadudNumber},${this.getStatusText(card.status)},${card.date},${userInfo},${gadudName},${gadudId},${remainingFuel}\n`;
+            csv += `${card.cardNumber},${card.name},${card.phone},${card.amount},${card.fuelType},${gadudNumber},${this.getStatusText(card.status)},${card.issueDate || card.date || ''},${userInfo},${gadudName},${gadudId},${remainingFuel}\n`;
         });
         
         // הורדה
@@ -1377,9 +1733,9 @@ class FuelCardManager {
 
     // הוספת נתונים גדודיים לכרטיס
     async addGadudData(cardNumber, gadudName, gadudId, remainingFuel, gadudIssueDate) {
-        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
-        if (!this.currentUser || this.currentUser.isAdmin) {
-            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+        // בדיקת הרשאות - צריך משתמש מחובר
+        if (!this.currentUser) {
+            this.showStatus('נדרשת התחברות', 'error');
             return;
         }
 
@@ -1390,8 +1746,15 @@ class FuelCardManager {
             return;
         }
 
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש
-        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
+        const card = this.fuelCards[cardIndex];
+        if (card.status === 'returned' || card.status === 'final_return') {
+            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
+        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
             this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
@@ -1411,9 +1774,9 @@ class FuelCardManager {
 
     // עדכון נתונים גדודיים לכרטיס
     async updateGadudData(cardNumber, gadudName, gadudId, remainingFuel) {
-        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
-        if (!this.currentUser || this.currentUser.isAdmin) {
-            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+        // בדיקת הרשאות - צריך משתמש מחובר
+        if (!this.currentUser) {
+            this.showStatus('נדרשת התחברות', 'error');
             return;
         }
 
@@ -1424,8 +1787,15 @@ class FuelCardManager {
             return;
         }
 
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש
-        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
+        const card = this.fuelCards[cardIndex];
+        if (card.status === 'returned' || card.status === 'final_return') {
+            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
+        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
             this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
@@ -1442,9 +1812,9 @@ class FuelCardManager {
 
     // מחיקת נתונים גדודיים מכרטיס (זיכוי גדודי)
     async clearGadudData(cardNumber, gadudCreditDate) {
-        // בדיקת הרשאות - רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים
-        if (!this.currentUser || this.currentUser.isAdmin) {
-            this.showStatus('רק משתמשים רגילים יכולים לעבוד עם נתונים גדודיים', 'error');
+        // בדיקת הרשאות - צריך משתמש מחובר
+        if (!this.currentUser) {
+            this.showStatus('נדרשת התחברות', 'error');
             return;
         }
 
@@ -1455,21 +1825,150 @@ class FuelCardManager {
             return;
         }
 
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש
-        if (this.fuelCards[cardIndex].gadudNumber !== this.currentUser.gadud) {
+        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
+        const card = this.fuelCards[cardIndex];
+        if (card.status === 'returned' || card.status === 'final_return') {
+            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
+            return;
+        }
+
+        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
+        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
             this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
             return;
         }
         
         this.fuelCards[cardIndex].gadudName = '';
         this.fuelCards[cardIndex].gadudId = '';
-        this.fuelCards[cardIndex].remainingFuel = '';
+        this.fuelCards[cardIndex].remainingFuel = 0;
         this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
         await this.saveDataToFirebase();
         this.renderTable();
         this.showStatus('נתונים גדודיים נמחקו בהצלחה (זיכוי גדודי)', 'success');
+    }
+
+    // הצגת חלונית אישור לזיכוי גדודי
+    showGadudCreditConfirmation(cardNumber, gadudCreditDate) {
+        // הסתר את הממשק הראשי
+        document.querySelector('.container').style.display = 'none';
+        
+        // צור/הצג חלונית אישור
+        let confirmationDialog = document.getElementById('gadudCreditConfirmationDialog');
+        if (!confirmationDialog) {
+            confirmationDialog = this.createGadudCreditConfirmationDialog();
+            document.body.appendChild(confirmationDialog);
+        }
+        
+        // שמור את הפרטים לחלונית
+        confirmationDialog.setAttribute('data-card-number', cardNumber);
+        confirmationDialog.setAttribute('data-credit-date', gadudCreditDate);
+        confirmationDialog.style.display = 'block';
+    }
+
+    createGadudCreditConfirmationDialog() {
+        const dialog = document.createElement('div');
+        dialog.id = 'gadudCreditConfirmationDialog';
+        dialog.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            ">
+                <div style="
+                    background: white;
+                    padding: 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                    text-align: center;
+                    min-width: 500px;
+                    max-width: 600px;
+                ">
+                    <h2 style="color: #2c3e50; margin-bottom: 30px; font-size: 1.5em;">אישור זיכוי גדודי</h2>
+                    <div style="
+                        background: #fff3cd;
+                        border: 2px solid #ffc107;
+                        border-radius: 10px;
+                        padding: 25px;
+                        margin-bottom: 30px;
+                        text-align: right;
+                        direction: rtl;
+                    ">
+                        <p style="
+                            color: #856404;
+                            font-size: 1.1em;
+                            line-height: 1.8;
+                            margin: 0;
+                            font-weight: 500;
+                        ">
+                            אני מאשר כי בדקתי ווידאתי שאכן הכרטיס נוצל עד תום והוא ריק לגמרי מדלק (או באמצעות האתר הייעודי לכך או באמצעות קבלות).
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="window.fuelCardManager.confirmGadudCredit()" style="
+                            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+                            color: white;
+                            border: none;
+                            padding: 15px 30px;
+                            border-radius: 25px;
+                            font-size: 16px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            min-width: 120px;
+                        ">מאשר</button>
+                        <button onclick="window.fuelCardManager.cancelGadudCredit()" style="
+                            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+                            color: white;
+                            border: none;
+                            padding: 15px 30px;
+                            border-radius: 25px;
+                            font-size: 16px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            min-width: 120px;
+                        ">לא מאשר</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        return dialog;
+    }
+
+    confirmGadudCredit() {
+        const dialog = document.getElementById('gadudCreditConfirmationDialog');
+        if (!dialog) return;
+        
+        const cardNumber = dialog.getAttribute('data-card-number');
+        const gadudCreditDate = dialog.getAttribute('data-credit-date');
+        
+        // סגור את החלונית
+        dialog.style.display = 'none';
+        document.querySelector('.container').style.display = 'block';
+        
+        // ביצוע הזיכוי
+        this.clearGadudData(cardNumber, gadudCreditDate);
+        hideTypingForm();
+        clearGadudReturnForm();
+    }
+
+    cancelGadudCredit() {
+        const dialog = document.getElementById('gadudCreditConfirmationDialog');
+        if (!dialog) return;
+        
+        // סגור את החלונית
+        dialog.style.display = 'none';
+        document.querySelector('.container').style.display = 'block';
+        
+        // הצג הודעה
+        this.showStatus('זיכוי גדודי בוטל', 'error');
     }
 
     // מערכת התחברות והרשאות
@@ -1482,9 +1981,20 @@ class FuelCardManager {
         this.currentUser = user;
     }
 
-    logout() {
+    async logout() {
+        // התנתקות מ-Firebase Authentication
+        if (window.auth && window.signOut) {
+            try {
+                await window.signOut(window.auth);
+                console.log('Firebase Authentication sign out successful');
+            } catch (authError) {
+                console.error('Firebase Authentication sign out error:', authError);
+            }
+        }
+        
         localStorage.removeItem('currentUser');
         this.currentUser = null;
+        this.clearBulkIssueState();
         this.showSplashScreen();
         setTimeout(() => {
             this.hideSplashScreen();
@@ -1563,7 +2073,7 @@ class FuelCardManager {
         this.updateInterfaceByPermissions();
     }
 
-    login() {
+    async login() {
         try {
             const name = document.getElementById('loginName').value.trim();
             const gadud = document.getElementById('loginGadud').value;
@@ -1619,12 +2129,33 @@ class FuelCardManager {
                 validatedName = name;
             }
             
+            // התחברות ל-Firebase Authentication (Anonymous)
+            let authUser = null;
+            if (window.auth && window.signInAnonymously) {
+                try {
+                    // בדיקה אם המשתמש כבר מחובר
+                    if (window.auth.currentUser) {
+                        authUser = window.auth.currentUser;
+                        console.log('משתמש כבר מחובר:', authUser.uid);
+                    } else {
+                        const userCredential = await window.signInAnonymously(window.auth);
+                        authUser = userCredential.user;
+                        console.log('Firebase Authentication successful:', authUser.uid);
+                    }
+                } catch (authError) {
+                    console.warn('Firebase Authentication error (המערכת תמשיך לעבוד):', authError);
+                    // אם Authentication נכשל, נמשיך עם ההתחברות הרגילה
+                    // לא נציג שגיאה למשתמש כי הכללים מאפשרים גישה גם בלי authentication
+                }
+            }
+            
             const user = {
                 name: validatedName,
                 gadud: validatedGadud,
                 isAdmin: isAdmin,
                 loginTime: new Date().toLocaleString('he-IL'),
-                sessionId: this.generateSessionId()
+                sessionId: this.generateSessionId(),
+                authUid: authUser ? authUser.uid : null
             };
             
             this.setCurrentUser(user);
@@ -1635,7 +2166,8 @@ class FuelCardManager {
             console.log('User Login:', { 
                 user: user.name, 
                 gadud: user.gadud, 
-                timestamp: user.loginTime 
+                timestamp: user.loginTime,
+                authUid: user.authUid
             });
             
         } catch (error) {
@@ -1681,6 +2213,7 @@ class FuelCardManager {
         
         // הסתר/הצג כפתורים לפי הרשאות
         this.updateButtonVisibility();
+        this.updateBulkIssueUI();
         
         // עדכן את הטבלה לפי הרשאות
         this.renderTable();
@@ -1708,6 +2241,20 @@ class FuelCardManager {
             'button[onclick*="showTypingForm(\'gadud_return\')"]'
         ];
 
+        // מצא את כל ה-control-card divs של ניפוק/עדכון/החזרת כרטיס
+        const controlCards = document.querySelectorAll('.control-card');
+        const adminControlCards = [];
+        
+        controlCards.forEach(card => {
+            const h3 = card.querySelector('h3');
+            if (h3) {
+                const title = h3.textContent.trim();
+                if (title === 'ניפוק כרטיס חדש' || title === 'עדכון כרטיס' || title === 'החזרת כרטיס') {
+                    adminControlCards.push(card);
+                }
+            }
+        });
+
         if (user.isAdmin) {
             // מנהל - הצג הכל
             adminButtons.forEach(selector => {
@@ -1718,6 +2265,10 @@ class FuelCardManager {
                 const buttons = document.querySelectorAll(selector);
                 buttons.forEach(btn => btn.style.display = 'block');
             });
+            // הצג את כל הכרטיסים
+            adminControlCards.forEach(card => {
+                card.style.display = 'block';
+            });
         } else {
             // משתמש רגיל - הסתר כפתורי מנהל, הצג רק גדודיים
             adminButtons.forEach(selector => {
@@ -1727,6 +2278,10 @@ class FuelCardManager {
             gadudButtons.forEach(selector => {
                 const buttons = document.querySelectorAll(selector);
                 buttons.forEach(btn => btn.style.display = 'block');
+            });
+            // הסתר את כל הכרטיסים של ניפוק/עדכון/החזרת כרטיס
+            adminControlCards.forEach(card => {
+                card.style.display = 'none';
             });
         }
     }
@@ -2098,6 +2653,10 @@ function showTypingForm(action) {
             form.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }, 100);
+
+    if (action === 'new' && window.fuelCardManager && window.fuelCardManager.isBulkIssueActive()) {
+        window.fuelCardManager.applyBulkIssueDataToForm();
+    }
 }
 
 // הסתרת כל הטופסים
@@ -2264,6 +2823,11 @@ function clearNewCardForm() {
                 field.value = '';
             }
         });
+        resetFuelTypeSelector('newFuelType');
+        resetAmountSelector('newAmount');
+        if (window.fuelCardManager && window.fuelCardManager.isBulkIssueActive()) {
+            window.fuelCardManager.applyBulkIssueDataToForm();
+        }
     } catch (error) {
         console.error('שגיאה בניקוי טופס:', error);
     }
@@ -2420,10 +2984,8 @@ function submitGadudReturn() {
             return;
         }
         
-        // ביצוע הפעולה
-        window.fuelCardManager.clearGadudData(validatedCardNumber, gadudCreditDate);
-        hideTypingForm();
-        clearGadudReturnForm();
+        // הצגת חלונית אישור לפני ביצוע הזיכוי
+        window.fuelCardManager.showGadudCreditConfirmation(validatedCardNumber, gadudCreditDate);
         
     } catch (error) {
         console.error('שגיאה בשליחת טופס זיכוי גדודי:', error);
@@ -2602,10 +3164,218 @@ function hideInstructions() {
     }
 }
 
-// הוספת תמיכה במקלדת לטופסים
+window.selectFuelType = function(inputId, value, button) {
+    try {
+        const selector = button ? button.closest('[data-fuel-selector]') : document.querySelector(`[data-fuel-selector="${inputId}"]`);
+        const input = document.getElementById(inputId);
+        if (!selector || !input) {
+            return;
+        }
+
+        const buttons = selector.querySelectorAll('[data-fuel-value]');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        if (button) {
+            button.classList.add('active');
+        } else {
+            const targetButton = selector.querySelector(`[data-fuel-value="${value}"]`);
+            if (targetButton) {
+                targetButton.classList.add('active');
+            }
+        }
+
+        const customWrapper = selector.querySelector('.fuel-type-custom');
+        if (value === 'other') {
+            if (customWrapper) {
+                customWrapper.classList.add('visible');
+                input.value = '';
+                input.focus();
+            }
+        } else {
+            if (customWrapper) {
+                customWrapper.classList.remove('visible');
+            }
+            input.value = value;
+        }
+    } catch (error) {
+        console.error('שגיאה בבחירת סוג דלק:', error);
+    }
+};
+
+window.handleCustomFuelInput = function(inputId) {
+    try {
+        const selector = document.querySelector(`[data-fuel-selector="${inputId}"]`);
+        if (!selector) {
+            return;
+        }
+        const buttons = selector.querySelectorAll('[data-fuel-value]');
+        const otherButton = selector.querySelector('[data-fuel-value="other"]');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        if (otherButton) {
+            otherButton.classList.add('active');
+        }
+    } catch (error) {
+        console.error('שגיאה בעדכון סוג דלק מותאם:', error);
+    }
+};
+
+window.resetFuelTypeSelector = function(inputId) {
+    try {
+        const selector = document.querySelector(`[data-fuel-selector="${inputId}"]`);
+        const input = document.getElementById(inputId);
+        if (!selector || !input) {
+            return;
+        }
+
+        selector.querySelectorAll('[data-fuel-value]').forEach(btn => btn.classList.remove('active'));
+        const customWrapper = selector.querySelector('.fuel-type-custom');
+        if (customWrapper) {
+            customWrapper.classList.remove('visible');
+        }
+        input.value = '';
+    } catch (error) {
+        console.error('שגיאה באיפוס בורר סוג דלק:', error);
+    }
+};
+
+window.selectAmount = function(inputId, value, button) {
+    try {
+        const selector = button ? button.closest('[data-amount-selector]') : document.querySelector(`[data-amount-selector="${inputId}"]`);
+        const input = document.getElementById(inputId);
+        if (!selector || !input) {
+            return;
+        }
+
+        const buttons = selector.querySelectorAll('[data-amount-value]');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        if (button) {
+            button.classList.add('active');
+        } else {
+            const targetButton = selector.querySelector(`[data-amount-value="${value}"]`);
+            if (targetButton) {
+                targetButton.classList.add('active');
+            }
+        }
+
+        const customWrapper = selector.querySelector('.amount-custom');
+        if (value === 'other') {
+            if (customWrapper) {
+                customWrapper.classList.add('visible');
+                input.value = '';
+                input.focus();
+            }
+        } else {
+            if (customWrapper) {
+                customWrapper.classList.remove('visible');
+            }
+            input.value = value;
+        }
+    } catch (error) {
+        console.error('שגיאה בבחירת כמות דלק:', error);
+    }
+};
+
+window.handleCustomAmountInput = function(inputId) {
+    try {
+        const selector = document.querySelector(`[data-amount-selector="${inputId}"]`);
+        if (!selector) {
+            return;
+        }
+
+        const buttons = selector.querySelectorAll('[data-amount-value]');
+        const otherButton = selector.querySelector('[data-amount-value="other"]');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        if (otherButton) {
+            otherButton.classList.add('active');
+        }
+    } catch (error) {
+        console.error('שגיאה בעדכון כמות מותאמת:', error);
+    }
+};
+
+window.resetAmountSelector = function(inputId) {
+    try {
+        const selector = document.querySelector(`[data-amount-selector="${inputId}"]`);
+        const input = document.getElementById(inputId);
+        if (!selector || !input) {
+            return;
+        }
+
+        selector.querySelectorAll('[data-amount-value]').forEach(btn => btn.classList.remove('active'));
+        const customWrapper = selector.querySelector('.amount-custom');
+        if (customWrapper) {
+            customWrapper.classList.remove('visible');
+        }
+        input.value = '';
+    } catch (error) {
+        console.error('שגיאה באיפוס בורר כמות:', error);
+    }
+};
+
+function activateBulkIssue() {
+    try {
+        if (!window.fuelCardManager || !window.fuelCardManager.currentUser || !window.fuelCardManager.currentUser.isAdmin) {
+            if (window.fuelCardManager) {
+                window.fuelCardManager.showStatus('מצב מקבץ זמין רק למנהל מערכת', 'error');
+            }
+            return;
+        }
+
+        const name = document.getElementById('newName').value.trim();
+        const phone = document.getElementById('newPhone').value.trim();
+        const gadudNumber = document.getElementById('newGadudNumber').value;
+
+        if (!name || !phone || !gadudNumber) {
+            window.fuelCardManager.showStatus('יש למלא שם, טלפון ומספר גדוד לפני הפעלת מקבץ', 'error');
+            return;
+        }
+
+        window.fuelCardManager.enableBulkIssue({ name, phone, gadudNumber });
+    } catch (error) {
+        console.error('שגיאה בהפעלת מקבץ:', error);
+    }
+}
+
+function deactivateBulkIssue() {
+    try {
+        if (!window.fuelCardManager || !window.fuelCardManager.currentUser || !window.fuelCardManager.currentUser.isAdmin) {
+            return;
+        }
+        window.fuelCardManager.disableBulkIssue();
+        clearNewCardForm();
+    } catch (error) {
+        console.error('שגיאה בביטול מקבץ:', error);
+    }
+}
+
+// הוספת תמיכה במקלדת לטופסים ו-keyboard shortcuts
 document.addEventListener('DOMContentLoaded', function() {
     try {
         console.log('מתחיל להגדיר תמיכה במקלדת...');
+        
+        // Keyboard shortcuts גלובליים
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+F / Cmd+F - חיפוש
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }
+            
+            // Esc - סגירת טופסים
+            if (e.key === 'Escape') {
+                const visibleForm = document.querySelector('.typing-form[style*="block"]');
+                if (visibleForm) {
+                    hideTypingForm();
+                }
+                const voiceInstructions = document.getElementById('voiceInstructions');
+                if (voiceInstructions && voiceInstructions.style.display === 'block') {
+                    hideInstructions();
+                }
+            }
+        });
         
         // תמיכה במקלדת לטופס ניפוק כרטיס חדש
         const newCardInputs = ['newCardNumber', 'newName', 'newPhone', 'newAmount', 'newFuelType', 'newGadudNumber'];
