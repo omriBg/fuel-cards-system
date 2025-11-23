@@ -2876,12 +2876,11 @@ function submitGadudNew() {
         
         const cardNumber = document.getElementById('gadudCardNumber').value;
         const gadudName = document.getElementById('gadudName').value;
-        const gadudId = document.getElementById('gadudId').value;
         const gadudIssueDateInput = document.getElementById('gadudIssueDate').value;
         const gadudIssueDate = window.fuelCardManager.formatDateTime(gadudIssueDateInput);
         
         // בדיקת שדות חובה
-        if (!cardNumber || !gadudName || !gadudId) {
+        if (!cardNumber || !gadudName) {
             window.fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
             return;
         }
@@ -2896,7 +2895,7 @@ function submitGadudNew() {
         }
         
         // ביצוע הפעולה
-        window.fuelCardManager.addGadudData(validatedCardNumber, gadudName, gadudId, undefined, gadudIssueDate);
+        window.fuelCardManager.addGadudData(validatedCardNumber, gadudName, '', undefined, gadudIssueDate);
         hideTypingForm();
         clearGadudNewForm();
         
@@ -2999,7 +2998,7 @@ function submitGadudReturn() {
 // ניקוי טופס ניפוק גדודי
 function clearGadudNewForm() {
     try {
-        const fields = ['gadudCardNumber', 'gadudName', 'gadudId', 'gadudIssueDate'];
+        const fields = ['gadudCardNumber', 'gadudName', 'gadudIssueDate'];
         fields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) {
@@ -3107,11 +3106,11 @@ function showVoiceInstructions(action) {
                     אמור את הפרטים הבאים:
                 </div>
                 <div class="example">
-                    "ניפוק גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
+                    "ניפוק גדודי כרטיס [מספר] [שם] [כמות דלק שנשאר]"
                 </div>
                 <div class="instruction-content">
                     <strong>דוגמה:</strong><br>
-                    "ניפוק גדודי כרטיס 123 יוסי כהן 1234567 30"
+                    "ניפוק גדודי כרטיס 123 יוסי כהן 30"
                 </div>
             `;
         } else if (action === 'gadud_update') {

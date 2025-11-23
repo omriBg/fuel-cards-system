@@ -2045,12 +2045,11 @@ function submitGadudNew() {
     
     const cardNumber = document.getElementById('gadudCardNumber').value;
     const gadudName = document.getElementById('gadudName').value;
-    const gadudId = document.getElementById('gadudId').value;
     const gadudIssueDateInput = document.getElementById('gadudIssueDate').value;
     const gadudIssueDate = fuelCardManager.formatDateTime(gadudIssueDateInput);
     
     // בדיקת שדות חובה
-    if (!cardNumber || !gadudName || !gadudId) {
+    if (!cardNumber || !gadudName) {
         fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
         return;
     }
@@ -2069,7 +2068,7 @@ function submitGadudNew() {
     
     // ביצוע הפעולה
     try {
-        fuelCardManager.addGadudData(cardNum, gadudName, gadudId, undefined, gadudIssueDate);
+        fuelCardManager.addGadudData(cardNum, gadudName, '', undefined, gadudIssueDate);
         hideTypingForm();
         clearGadudNewForm();
     } catch (error) {
@@ -2150,7 +2149,6 @@ function submitGadudReturn() {
 function clearGadudNewForm() {
     document.getElementById('gadudCardNumber').value = '';
     document.getElementById('gadudName').value = '';
-    document.getElementById('gadudId').value = '';
     const issueDateField = document.getElementById('gadudIssueDate');
     if (issueDateField) {
         issueDateField.value = '';
@@ -2234,11 +2232,11 @@ function showVoiceInstructions(action) {
                 אמור את הפרטים הבאים:
             </div>
             <div class="example">
-                "ניפוק גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
+                "ניפוק גדודי כרטיס [מספר] [שם] [כמות דלק שנשאר]"
             </div>
             <div class="instruction-content">
                 <strong>דוגמה:</strong><br>
-                "ניפוק גדודי כרטיס 123 יוסי כהן 1234567 30"
+                "ניפוק גדודי כרטיס 123 יוסי כהן 30"
             </div>
         `;
     } else if (action === 'gadud_update') {
