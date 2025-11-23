@@ -1356,7 +1356,7 @@ class FuelCardManager {
                 value = card.gadudId || '';
                 break;
             case 'remainingFuel':
-                value = card.remainingFuel || card.amount || '';
+                value = (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (card.amount || '');
                 break;
             default:
                 // עמודות מותאמות אישית

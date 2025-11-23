@@ -538,7 +538,7 @@ class FuelCardManager {
             case 'gadudId':
                 return card.gadudId || '';
             case 'remainingFuel':
-                return card.remainingFuel || card.amount || '';
+                return (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (card.amount || '');
             default:
                 // עמודות מותאמות אישית
                 return card[column.id] || '';
