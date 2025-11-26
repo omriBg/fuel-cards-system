@@ -339,6 +339,16 @@ class FuelCardManager {
             return;
         }
 
+        // בדיקת תקינות סוג דלק
+        if (command.fuelType) {
+            const allowedFuels = ['בנזין', 'סולר', 'דיזל', 'גז', 'חשמל', 'היברידי'];
+            const fuel = command.fuelType.toString().trim();
+            if (!allowedFuels.includes(fuel)) {
+                this.showStatus('סוג דלק לא תקין - בחר: בנזין, סולר, דיזל, גז, חשמל, היברידי', 'error');
+                return;
+            }
+        }
+
         const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
         
         if (existingIndex !== -1) {
