@@ -180,9 +180,9 @@ class FuelCardManager {
                     
                 case 'fuelType':
                     const fuel = input.toString().trim();
-                    const allowedFuels = ['בנזין', 'דיזל', 'גז', 'חשמל', 'היברידי'];
+                    const allowedFuels = ['בנזין', 'סולר', 'דיזל', 'גז', 'חשמל', 'היברידי'];
                     if (!allowedFuels.includes(fuel)) {
-                        throw new Error('סוג דלק לא תקין - בחר: בנזין, דיזל, גז, חשמל, היברידי');
+                        throw new Error('סוג דלק לא תקין - בחר: בנזין, סולר, דיזל, גז, חשמל, היברידי');
                     }
                     return fuel;
                     
