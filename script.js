@@ -1695,7 +1695,7 @@ class FuelCardManager {
 
 
     // הורדת Excel
-    downloadExcel() {
+    async downloadExcel() {
         const filteredCards = this.getFilteredAndSearchedCards();
         
         if (filteredCards.length === 0) {
@@ -1703,7 +1703,35 @@ class FuelCardManager {
             return;
         }
         
-        // בדיקה שהספרייה נטענה
+        // טעינת הספרייה אם לא נטענה
+        if (typeof XLSX === 'undefined') {
+            this.showStatus('טוען ספריית Excel...', 'processing');
+            try {
+                if (window.loadXLSX) {
+                    await window.loadXLSX();
+                } else {
+                    // נסה לטעון ידנית
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                        script.onload = () => resolve();
+                        script.onerror = () => {
+                            const script2 = document.createElement('script');
+                            script2.src = 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+                            script2.onload = () => resolve();
+                            script2.onerror = () => reject(new Error('לא ניתן לטעון את ספריית Excel'));
+                            document.head.appendChild(script2);
+                        };
+                        document.head.appendChild(script);
+                    });
+                }
+            } catch (error) {
+                this.showStatus('שגיאה בטעינת ספריית Excel. נסה לרענן את הדף.', 'error');
+                return;
+            }
+        }
+        
+        // בדיקה נוספת שהספרייה נטענה
         if (typeof XLSX === 'undefined') {
             this.showStatus('שגיאה: ספריית Excel לא נטענה. נסה לרענן את הדף.', 'error');
             return;

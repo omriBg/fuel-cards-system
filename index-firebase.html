@@ -1009,11 +1009,50 @@
         </div>
     </div>
 
-    <!-- SheetJS library for Excel export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
     <!-- Firebase SDK -->
     <script type="module" src="firebase-config.js"></script>
     <script src="script-firebase.js"></script>
+    
+    <!-- SheetJS library for Excel export - טעינה דינמית -->
+    <script>
+        // טעינת ספריית SheetJS
+        function loadXLSX() {
+            return new Promise((resolve, reject) => {
+                if (typeof XLSX !== 'undefined') {
+                    resolve();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                script.onload = () => {
+                    if (typeof XLSX !== 'undefined') {
+                        resolve();
+                    } else {
+                        reject(new Error('הספרייה לא נטענה'));
+                    }
+                };
+                script.onerror = () => {
+                    // נסה CDN אחר
+                    const script2 = document.createElement('script');
+                    script2.src = 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+                    script2.onload = () => resolve();
+                    script2.onerror = () => reject(new Error('לא ניתן לטעון את ספריית Excel'));
+                    document.head.appendChild(script2);
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        // טען את הספרייה כשהדף נטען
+        window.addEventListener('DOMContentLoaded', () => {
+            loadXLSX().catch(err => {
+                console.error('שגיאה בטעינת ספריית Excel:', err);
+            });
+        });
+        
+        // שמור את הפונקציה גלובלית
+        window.loadXLSX = loadXLSX;
+    </script>
 </body>
 </html>
