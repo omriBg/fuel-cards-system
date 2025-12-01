@@ -1645,6 +1645,12 @@
         console.log('Firebase initialized, loading script.js...');
         window.firebaseReady = true;
         
+        // טען את ספריית SheetJS ל-Excel
+        const xlsxScript = document.createElement('script');
+        xlsxScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        xlsxScript.async = false;
+        document.body.appendChild(xlsxScript);
+        
         // טען את script.js רק אחרי ש-Firebase מוכן
         const script = document.createElement('script');
         script.src = 'script.js';

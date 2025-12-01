@@ -915,30 +915,82 @@ class FuelCardManager {
             return;
         }
         
-        // יצירת CSV עם העמודות החדשות
-        let csv = 'מספר כרטיס,שם,טלפון,כמות (ליטר),סוג דלק,מספר גדוד,סטטוס,תאריך ניפוק,משתמש,שם (ניפוק גדודי),מספר אישי (ניפוק גדודי),כמות דלק שנשאר (ניפוק גדודי)\n';
+        // בדיקה שהספרייה נטענה
+        if (typeof XLSX === 'undefined') {
+            this.showStatus('שגיאה: ספריית Excel לא נטענה. נסה לרענן את הדף.', 'error');
+            return;
+        }
         
+        // יצירת מערך של נתונים ל-Excel
+        const excelData = [];
+        
+        // הוספת כותרות
+        excelData.push([
+            'מספר כרטיס',
+            'שם',
+            'טלפון',
+            'כמות (ליטר)',
+            'סוג דלק',
+            'מספר גדוד',
+            'סטטוס',
+            'תאריך ניפוק',
+            'משתמש',
+            'שם (ניפוק גדודי)',
+            'מספר אישי (ניפוק גדודי)',
+            'כמות דלק שנשאר (ניפוק גדודי)'
+        ]);
+        
+        // הוספת הנתונים
         filteredCards.forEach(card => {
             const userInfo = this.getUserInfo(card).replace(/<br>/g, ' | ');
-            // הוספת העמודות החדשות - כרגע ריקות, ניתן להוסיף לוגיקה בהמשך
             const gadudNumber = card.gadudNumber || '';
             const gadudName = card.gadudName || '';
             const gadudId = card.gadudId || '';
             const remainingFuel = card.remainingFuel || card.amount || '';
             
-            csv += `${card.cardNumber},${card.name},${card.phone},${card.amount},${card.fuelType},${gadudNumber},${this.getStatusText(card.status)},${card.issueDate || card.date || ''},${userInfo},${gadudName},${gadudId},${remainingFuel}\n`;
+            excelData.push([
+                card.cardNumber,
+                card.name,
+                card.phone,
+                card.amount,
+                card.fuelType,
+                gadudNumber,
+                this.getStatusText(card.status),
+                card.issueDate || card.date || '',
+                userInfo,
+                gadudName,
+                gadudId,
+                remainingFuel
+            ]);
         });
         
-        // הורדה
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `fuel_cards_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // יצירת workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        
+        // הגדרת רוחב עמודות
+        const colWidths = [
+            { wch: 12 },  // מספר כרטיס
+            { wch: 20 },  // שם
+            { wch: 15 },  // טלפון
+            { wch: 12 },  // כמות
+            { wch: 12 },  // סוג דלק
+            { wch: 12 },  // מספר גדוד
+            { wch: 12 },  // סטטוס
+            { wch: 18 },  // תאריך ניפוק
+            { wch: 20 },  // משתמש
+            { wch: 20 },  // שם גדודי
+            { wch: 20 },  // מספר אישי גדודי
+            { wch: 25 }   // כמות דלק שנשאר
+        ];
+        ws['!cols'] = colWidths;
+        
+        // הוספת גיליון ל-workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'כרטיסי דלק');
+        
+        // הורדת הקובץ
+        const fileName = `fuel_cards_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
         
         this.showStatus('קובץ Excel הורד בהצלחה', 'success');
     }
