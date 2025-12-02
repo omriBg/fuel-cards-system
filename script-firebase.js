@@ -585,6 +585,9 @@ class FuelCardManager {
         // קבל כרטיסים מסוננים לפי הרשאות וחיפוש
         const filteredCards = this.getFilteredAndSearchedCards();
         
+        // עדכון תצוגת מספר כרטיסים מסוננים (למנהל)
+        this.updateFilteredCardsCount(filteredCards);
+        
         // עדכון סטטיסטיקות
         this.updateStats(filteredCards);
         
@@ -644,15 +647,37 @@ class FuelCardManager {
     getFilteredAndSearchedCards() {
         let cards = this.getFilteredCards();
         
-        // סינון לפי סטטוס
+        // סינון לפי סטטוס (עדכון לתמיכה בכל האפשרויות)
         const statusFilter = document.getElementById('statusFilter');
-        if (statusFilter && statusFilter.value === 'not_returned') {
-            // הצג רק כרטיסים שלא זוכו (לא ירוקים)
-            cards = cards.filter(card => {
-                return card.status !== 'returned' && card.status !== 'final_return';
-            });
+        if (statusFilter && statusFilter.value !== 'all') {
+            if (statusFilter.value === 'not_credited') {
+                // הצג רק כרטיסים שלא זוכו (לא ירוקים)
+                cards = cards.filter(card => {
+                    return card.status !== 'returned' && card.status !== 'final_return';
+                });
+            } else if (statusFilter.value === 'credited') {
+                // הצג רק כרטיסים שזוכו
+                cards = cards.filter(card => {
+                    return card.status === 'returned' || card.status === 'final_return';
+                });
+            } else if (statusFilter.value === 'new') {
+                cards = cards.filter(card => card.status === 'new');
+            } else if (statusFilter.value === 'updated') {
+                cards = cards.filter(card => card.status === 'updated');
+            } else if (statusFilter.value === 'returned') {
+                cards = cards.filter(card => card.status === 'returned' || card.status === 'final_return');
+            }
         }
-        // אם statusFilter.value === 'all' - הצג הכל (אין צורך לסנן)
+        
+        // סינון לפי גדוד (רק למנהל)
+        const gadudFilter = document.getElementById('gadudFilter');
+        if (gadudFilter && this.currentUser && this.currentUser.isAdmin && gadudFilter.value !== 'all') {
+            if (gadudFilter.value === 'no_gadud') {
+                cards = cards.filter(card => !card.gadudNumber || card.gadudNumber === '');
+            } else {
+                cards = cards.filter(card => card.gadudNumber === gadudFilter.value);
+            }
+        }
         
         // חיפוש
         const searchInput = document.getElementById('searchInput');
@@ -668,12 +693,97 @@ class FuelCardManager {
             });
         }
         
+        // מיון (רק למנהל)
+        const sortBy = document.getElementById('sortBy');
+        if (sortBy && this.currentUser && this.currentUser.isAdmin && sortBy.value !== 'none') {
+            cards = this.sortCards(cards, sortBy.value);
+        }
+        
         return cards;
+    }
+    
+    // פונקציה למיון כרטיסים
+    sortCards(cards, sortOption) {
+        const sortedCards = [...cards];
+        
+        sortedCards.sort((a, b) => {
+            switch(sortOption) {
+                case 'date_asc':
+                    return this.compareDates(a.issueDate || a.date || '', b.issueDate || b.date || '');
+                case 'date_desc':
+                    return this.compareDates(b.issueDate || b.date || '', a.issueDate || a.date || '');
+                case 'credit_date_asc':
+                    return this.compareDates(a.creditDate || '', b.creditDate || '');
+                case 'credit_date_desc':
+                    return this.compareDates(b.creditDate || '', a.creditDate || '');
+                case 'card_number_asc':
+                    return (a.cardNumber || 0) - (b.cardNumber || 0);
+                case 'card_number_desc':
+                    return (b.cardNumber || 0) - (a.cardNumber || 0);
+                default:
+                    return 0;
+            }
+        });
+        
+        return sortedCards;
+    }
+    
+    // פונקציה להשוואת תאריכים
+    compareDates(dateA, dateB) {
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        
+        const dateAObj = new Date(dateA);
+        const dateBObj = new Date(dateB);
+        
+        if (isNaN(dateAObj.getTime()) && isNaN(dateBObj.getTime())) return 0;
+        if (isNaN(dateAObj.getTime())) return 1;
+        if (isNaN(dateBObj.getTime())) return -1;
+        
+        return dateAObj.getTime() - dateBObj.getTime();
+    }
+    
+    // החלת מיון וסינון
+    applySortingAndFiltering() {
+        this.renderTable();
+    }
+    
+    // איפוס מיון וסינון
+    resetSortingAndFiltering() {
+        const sortBy = document.getElementById('sortBy');
+        const statusFilter = document.getElementById('statusFilter');
+        const gadudFilter = document.getElementById('gadudFilter');
+        
+        if (sortBy) sortBy.value = 'none';
+        if (statusFilter) statusFilter.value = 'all';
+        if (gadudFilter) gadudFilter.value = 'all';
+        
+        this.renderTable();
     }
     
     // סינון טבלה לפי חיפוש
     filterTable() {
         this.renderTable();
+    }
+    
+    // עדכון תצוגת מספר כרטיסים מסוננים
+    updateFilteredCardsCount(filteredCards) {
+        const countElement = document.getElementById('filteredCardsCount');
+        if (!countElement) return;
+        
+        const totalCards = this.fuelCards.length;
+        const filteredCount = filteredCards.length;
+        
+        if (this.currentUser && this.currentUser.isAdmin) {
+            if (filteredCount === totalCards) {
+                countElement.textContent = `סה"כ כרטיסים: ${totalCards}`;
+            } else {
+                countElement.textContent = `מוצגים ${filteredCount} מתוך ${totalCards} כרטיסים`;
+            }
+        } else {
+            countElement.textContent = '';
+        }
     }
     
     // עדכון סטטיסטיקות
@@ -1381,13 +1491,20 @@ class FuelCardManager {
         const userInfo = document.getElementById('currentUserInfo');
         const userInfoDiv = document.getElementById('userInfo');
         const adminPanelBtn = document.getElementById('adminPanelBtn');
+        const adminSortingControls = document.getElementById('adminSortingControls');
         
         if (user.isAdmin) {
             userInfo.textContent = `${user.name} - מנהל מערכת`;
             adminPanelBtn.style.display = 'inline-block';
+            if (adminSortingControls) {
+                adminSortingControls.style.display = 'block';
+            }
         } else {
             userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
             adminPanelBtn.style.display = 'none';
+            if (adminSortingControls) {
+                adminSortingControls.style.display = 'none';
+            }
         }
         
         userInfoDiv.style.display = 'block';
