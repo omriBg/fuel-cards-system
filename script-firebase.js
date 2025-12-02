@@ -29,6 +29,10 @@ class FuelCardManager {
         this.initSpeechRecognition();
         this.checkLogin();
         this.loadDataFromFirebase();
+        // עדכן את פקדי המיון והסינון אחרי טעינת הדף
+        setTimeout(() => {
+            this.updateAdminSortingControls();
+        }, 1000);
         console.log('המערכת מוכנה לשימוש!');
     }
 
@@ -1478,6 +1482,10 @@ class FuelCardManager {
         
         this.setCurrentUser(user);
         this.showMainInterface();
+        // עדכן את פקדי המיון והסינון מיד אחרי התחברות
+        setTimeout(() => {
+            this.updateAdminSortingControls();
+        }, 500);
         this.showStatus(`ברוך הבא!`, 'success');
     }
 
@@ -1526,24 +1534,23 @@ class FuelCardManager {
     updateAdminSortingControls() {
         const adminSortingControls = document.getElementById('adminSortingControls');
         if (!adminSortingControls) {
-            console.warn('adminSortingControls לא נמצא בדף');
-            // נסה שוב אחרי זמן קצר
-            setTimeout(() => {
-                const retryElement = document.getElementById('adminSortingControls');
-                if (retryElement && this.currentUser && this.currentUser.isAdmin) {
-                    retryElement.style.display = 'block';
-                    console.log('פקדי מיון וסינון הוצגו לאחר ניסיון חוזר');
-                }
-            }, 500);
+            console.warn('adminSortingControls לא נמצא בדף - נסה שוב בעוד רגע');
             return;
         }
         
-        if (this.currentUser && this.currentUser.isAdmin) {
+        // בדוק אם המשתמש הוא מנהל
+        const isAdmin = this.currentUser && this.currentUser.isAdmin;
+        
+        if (isAdmin) {
             adminSortingControls.style.display = 'block';
-            console.log('פקדי מיון וסינון מוצגים למנהל מערכת');
+            console.log('✅ פקדי מיון וסינון מוצגים למנהל מערכת');
         } else {
             adminSortingControls.style.display = 'none';
-            console.log('פקדי מיון וסינון מוסתרים - משתמש לא מנהל');
+            if (this.currentUser) {
+                console.log('❌ פקדי מיון וסינון מוסתרים - משתמש לא מנהל');
+            } else {
+                console.log('❌ פקדי מיון וסינון מוסתרים - אין משתמש מחובר');
+            }
         }
     }
 
