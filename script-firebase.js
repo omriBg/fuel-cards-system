@@ -61,6 +61,10 @@ class FuelCardManager {
             console.log('כרטיסים נטענו מ-Firebase:', this.fuelCards.length);
             this.hideLoadingState();
             this.renderTable();
+            // עדכן את הפקדים אחרי טעינת הנתונים
+            if (this.currentUser && this.currentUser.isAdmin) {
+                this.updateAdminSortingControls();
+            }
         } catch (error) {
             console.error('שגיאה בטעינת נתונים מ-Firebase:', error);
             this.hideLoadingState();
@@ -641,6 +645,11 @@ class FuelCardManager {
             row.innerHTML = rowContent;
             tbody.appendChild(row);
         });
+        
+        // עדכן את פקדי המיון והסינון אחרי רינדור הטבלה
+        if (this.currentUser && this.currentUser.isAdmin) {
+            this.updateAdminSortingControls();
+        }
     }
     
     // סינון וחיפוש כרטיסים
@@ -1491,23 +1500,19 @@ class FuelCardManager {
         const userInfo = document.getElementById('currentUserInfo');
         const userInfoDiv = document.getElementById('userInfo');
         const adminPanelBtn = document.getElementById('adminPanelBtn');
-        const adminSortingControls = document.getElementById('adminSortingControls');
         
         if (user.isAdmin) {
             userInfo.textContent = `${user.name} - מנהל מערכת`;
             adminPanelBtn.style.display = 'inline-block';
-            if (adminSortingControls) {
-                adminSortingControls.style.display = 'block';
-            }
         } else {
             userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
             adminPanelBtn.style.display = 'none';
-            if (adminSortingControls) {
-                adminSortingControls.style.display = 'none';
-            }
         }
         
         userInfoDiv.style.display = 'block';
+        
+        // עדכן את פקדי המיון והסינון
+        this.updateAdminSortingControls();
         
         // הסתר/הצג כפתורים לפי הרשאות
         this.updateButtonVisibility();
@@ -1515,6 +1520,31 @@ class FuelCardManager {
         
         // עדכן את הטבלה לפי הרשאות
         this.renderTable();
+    }
+    
+    // עדכון פקדי מיון וסינון למנהל
+    updateAdminSortingControls() {
+        const adminSortingControls = document.getElementById('adminSortingControls');
+        if (!adminSortingControls) {
+            console.warn('adminSortingControls לא נמצא בדף');
+            // נסה שוב אחרי זמן קצר
+            setTimeout(() => {
+                const retryElement = document.getElementById('adminSortingControls');
+                if (retryElement && this.currentUser && this.currentUser.isAdmin) {
+                    retryElement.style.display = 'block';
+                    console.log('פקדי מיון וסינון הוצגו לאחר ניסיון חוזר');
+                }
+            }, 500);
+            return;
+        }
+        
+        if (this.currentUser && this.currentUser.isAdmin) {
+            adminSortingControls.style.display = 'block';
+            console.log('פקדי מיון וסינון מוצגים למנהל מערכת');
+        } else {
+            adminSortingControls.style.display = 'none';
+            console.log('פקדי מיון וסינון מוסתרים - משתמש לא מנהל');
+        }
     }
 
     // עדכון נראות כפתורים לפי הרשאות
