@@ -1508,16 +1508,20 @@ class FuelCardManager {
         const userInfo = document.getElementById('currentUserInfo');
         const userInfoDiv = document.getElementById('userInfo');
         const adminPanelBtn = document.getElementById('adminPanelBtn');
+        const editCardBtn = document.getElementById('editCardBtn');
         
         if (user.isAdmin) {
             userInfo.textContent = `${user.name} - מנהל מערכת`;
-            adminPanelBtn.style.display = 'inline-block';
-            const editCardBtn = document.getElementById('editCardBtn');
-            if (editCardBtn) editCardBtn.style.display = 'inline-block';
+            if (adminPanelBtn) adminPanelBtn.style.display = 'inline-block';
+            if (editCardBtn) {
+                editCardBtn.style.display = 'inline-block';
+                console.log('✅ כפתור עריכת כרטיס מוצג למנהל מערכת');
+            } else {
+                console.error('❌ כפתור עריכת כרטיס לא נמצא ב-DOM');
+            }
         } else {
             userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
-            adminPanelBtn.style.display = 'none';
-            const editCardBtn = document.getElementById('editCardBtn');
+            if (adminPanelBtn) adminPanelBtn.style.display = 'none';
             if (editCardBtn) editCardBtn.style.display = 'none';
         }
         
