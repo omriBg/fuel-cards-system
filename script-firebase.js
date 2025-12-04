@@ -34,15 +34,6 @@ class FuelCardManager {
             this.updateAdminSortingControls();
         }, 1000);
         console.log('המערכת מוכנה לשימוש!');
-        
-        // הסתר את ה-splash screen אחרי שהמערכת נטענה
-        setTimeout(() => {
-            const splashScreen = document.getElementById('splashScreen');
-            if (splashScreen && splashScreen.style.display !== 'none') {
-                splashScreen.style.display = 'none';
-                console.log('Splash screen הוסתר אחרי טעינת המערכת');
-            }
-        }, 2000);
     }
 
     formatDateTime(value) {
@@ -1416,12 +1407,9 @@ class FuelCardManager {
     }
 
     checkLogin() {
-        console.log('בודק התחברות, משתמש נוכחי:', this.currentUser);
         if (!this.currentUser) {
-            console.log('אין משתמש מחובר - מציג טופס התחברות');
             this.showLoginForm();
         } else {
-            console.log('משתמש מחובר - מציג ממשק ראשי');
             this.showMainInterface();
         }
     }
@@ -1429,51 +1417,29 @@ class FuelCardManager {
     showLoginForm() {
         // הסתר את ה-splash screen
         const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) {
-            splashScreen.style.display = 'none';
-            console.log('Splash screen הוסתר (בטופס התחברות)');
-        }
+        if (splashScreen) splashScreen.style.display = 'none';
         
         // הסתר את הממשק הראשי
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
-        if (container) {
-            container.style.display = 'none';
-        }
+        if (container) container.style.display = 'none';
         
         // הצג טופס התחברות
         const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.style.display = 'block';
-        }
+        if (loginForm) loginForm.style.display = 'block';
     }
 
     showMainInterface() {
-        console.log('מציג את הממשק הראשי...');
-        
         // הסתר את ה-splash screen
         const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) {
-            splashScreen.style.display = 'none';
-            console.log('Splash screen הוסתר');
-        }
+        if (splashScreen) splashScreen.style.display = 'none';
         
         // הסתר טופס התחברות
         const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.style.display = 'none';
-            console.log('טופס התחברות הוסתר');
-        } else {
-            console.warn('טופס התחברות לא נמצא');
-        }
+        if (loginForm) loginForm.style.display = 'none';
         
-        // הצג את הממשק הראשי - נסה גם .container וגם #mainContainer
+        // הצג את הממשק הראשי
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
-        if (container) {
-            container.style.display = 'block';
-            console.log('ממשק ראשי מוצג');
-        } else {
-            console.error('container לא נמצא!');
-        }
+        if (container) container.style.display = 'block';
         
         // עדכן את הממשק לפי הרשאות המשתמש
         this.updateInterfaceByPermissions();
