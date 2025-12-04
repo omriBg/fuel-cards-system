@@ -1512,9 +1512,13 @@ class FuelCardManager {
         if (user.isAdmin) {
             userInfo.textContent = `${user.name} - מנהל מערכת`;
             adminPanelBtn.style.display = 'inline-block';
+            const editCardBtn = document.getElementById('editCardBtn');
+            if (editCardBtn) editCardBtn.style.display = 'inline-block';
         } else {
             userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
             adminPanelBtn.style.display = 'none';
+            const editCardBtn = document.getElementById('editCardBtn');
+            if (editCardBtn) editCardBtn.style.display = 'none';
         }
         
         userInfoDiv.style.display = 'block';
@@ -1887,6 +1891,468 @@ class FuelCardManager {
         });
 
         alert(info);
+    }
+
+    // הצגת טופס עריכת כרטיס (עם אימות סיסמה)
+    showEditCardForm() {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה לערוך כרטיסים', 'error');
+            return;
+        }
+
+        // הצג חלונית אימות סיסמה
+        this.showEditCardPasswordDialog();
+    }
+
+    // הצגת חלונית אימות סיסמה לעריכה
+    showEditCardPasswordDialog() {
+        // הסתר את הממשק הראשי
+        document.querySelector('.container').style.display = 'none';
+        
+        // צור/הצג חלונית סיסמה
+        let passwordDialog = document.getElementById('editCardPasswordDialog');
+        if (!passwordDialog) {
+            passwordDialog = this.createEditCardPasswordDialog();
+            document.body.appendChild(passwordDialog);
+        }
+        
+        passwordDialog.style.display = 'block';
+        // נקה את שדה הסיסמה
+        const passwordInput = document.getElementById('editCardPassword');
+        if (passwordInput) {
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    }
+
+    // יצירת חלונית אימות סיסמה
+    createEditCardPasswordDialog() {
+        const dialog = document.createElement('div');
+        dialog.id = 'editCardPasswordDialog';
+        dialog.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            ">
+                <div style="
+                    background: white;
+                    padding: 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                    text-align: center;
+                    min-width: 400px;
+                    direction: rtl;
+                ">
+                    <h2 style="color: #2c3e50; margin-bottom: 30px;">אימות סיסמה לעריכה</h2>
+                    <div style="margin-bottom: 20px;">
+                        <input type="password" id="editCardPassword" placeholder="הכנס סיסמה" style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 2px solid #ddd;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            margin-bottom: 15px;
+                        " onkeypress="if(event.key === 'Enter') fuelCardManager.verifyEditCardPassword()">
+                    </div>
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="fuelCardManager.verifyEditCardPassword()" style="
+                            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+                            color: white;
+                            border: none;
+                            padding: 15px 30px;
+                            border-radius: 25px;
+                            font-size: 16px;
+                            cursor: pointer;
+                            font-weight: 600;
+                        ">אישור</button>
+                        <button onclick="fuelCardManager.cancelEditCardPassword()" style="
+                            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+                            color: white;
+                            border: none;
+                            padding: 15px 30px;
+                            border-radius: 25px;
+                            font-size: 16px;
+                            cursor: pointer;
+                            font-weight: 600;
+                        ">ביטול</button>
+                    </div>
+                    <div id="editCardPasswordStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
+                </div>
+            </div>
+        `;
+        return dialog;
+    }
+
+    // אימות סיסמה לעריכה
+    verifyEditCardPassword() {
+        const passwordInput = document.getElementById('editCardPassword');
+        const statusDiv = document.getElementById('editCardPasswordStatus');
+        
+        if (!passwordInput) return;
+        
+        const password = passwordInput.value.trim();
+        
+        if (password !== 'omribg9526') {
+            if (statusDiv) {
+                statusDiv.textContent = 'סיסמה שגויה';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.border = '1px solid #f5c6cb';
+                statusDiv.style.display = 'block';
+            }
+            passwordInput.value = '';
+            passwordInput.focus();
+            return;
+        }
+        
+        // סיסמה נכונה - סגור את חלונית הסיסמה והצג את טופס העריכה
+        const passwordDialog = document.getElementById('editCardPasswordDialog');
+        if (passwordDialog) {
+            passwordDialog.style.display = 'none';
+        }
+        
+        this.showEditCardFormDialog();
+    }
+
+    // ביטול אימות סיסמה
+    cancelEditCardPassword() {
+        const passwordDialog = document.getElementById('editCardPasswordDialog');
+        if (passwordDialog) {
+            passwordDialog.style.display = 'none';
+        }
+        document.querySelector('.container').style.display = 'block';
+    }
+
+    // הצגת טופס עריכת כרטיס
+    showEditCardFormDialog() {
+        // צור/הצג טופס עריכה
+        let editForm = document.getElementById('editCardFormDialog');
+        if (!editForm) {
+            editForm = this.createEditCardFormDialog();
+            document.body.appendChild(editForm);
+        }
+        
+        // נקה את הטופס
+        this.clearEditCardForm();
+        
+        editForm.style.display = 'block';
+    }
+
+    // יצירת טופס עריכת כרטיס
+    createEditCardFormDialog() {
+        const dialog = document.createElement('div');
+        dialog.id = 'editCardFormDialog';
+        dialog.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+                overflow-y: auto;
+                padding: 20px;
+            ">
+                <div style="
+                    background: white;
+                    padding: 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                    text-align: right;
+                    min-width: 500px;
+                    max-width: 800px;
+                    width: 100%;
+                    direction: rtl;
+                ">
+                    <h2 style="color: #2c3e50; margin-bottom: 30px; text-align: center;">עריכת כרטיס</h2>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר כרטיס (לחיפוש):</label>
+                        <input type="number" id="editCardSearchNumber" placeholder="הכנס מספר כרטיס" style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 2px solid #ddd;
+                            border-radius: 8px;
+                            font-size: 16px;
+                        " onkeypress="if(event.key === 'Enter') fuelCardManager.searchCardForEdit()">
+                        <button onclick="fuelCardManager.searchCardForEdit()" style="
+                            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            cursor: pointer;
+                            margin-top: 10px;
+                            width: 100%;
+                        ">חפש כרטיס</button>
+                    </div>
+                    
+                    <div id="editCardFormFields" style="display: none;">
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר כרטיס:</label>
+                            <input type="number" id="editCardNumber" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #ddd;
+                                border-radius: 8px;
+                                font-size: 16px;
+                            ">
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">סוג דלק:</label>
+                            <div class="fuel-type-selector" data-fuel-selector="editFuelType">
+                                <div class="fuel-type-buttons">
+                                    <button type="button" class="fuel-type-option" data-fuel-value="בנזין" onclick="selectFuelType('editFuelType', 'בנזין', this)">בנזין</button>
+                                    <button type="button" class="fuel-type-option" data-fuel-value="סולר" onclick="selectFuelType('editFuelType', 'סולר', this)">סולר</button>
+                                    <button type="button" class="fuel-type-option" data-fuel-value="other" onclick="selectFuelType('editFuelType', 'other', this)">אחר</button>
+                                </div>
+                                <div class="fuel-type-custom">
+                                    <input type="text" id="editFuelType" placeholder="הקלד סוג דלק" oninput="handleCustomFuelInput('editFuelType')">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר גדוד:</label>
+                            <select id="editGadudNumber" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #ddd;
+                                border-radius: 8px;
+                                font-size: 16px;
+                            ">
+                                <option value="">בחר מספר גדוד</option>
+                                <option value="650">650</option>
+                                <option value="703">703</option>
+                                <option value="651">651</option>
+                                <option value="791">791</option>
+                                <option value="652">652</option>
+                                <option value="638">638</option>
+                                <option value="653">653</option>
+                                <option value="674">674</option>
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                            <button onclick="fuelCardManager.submitEditCard()" style="
+                                background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 25px;
+                                font-size: 16px;
+                                cursor: pointer;
+                                font-weight: 600;
+                            ">שמור שינויים</button>
+                            <button onclick="fuelCardManager.cancelEditCard()" style="
+                                background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 25px;
+                                font-size: 16px;
+                                cursor: pointer;
+                                font-weight: 600;
+                            ">ביטול</button>
+                        </div>
+                    </div>
+                    
+                    <div id="editCardStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
+                </div>
+            </div>
+        `;
+        return dialog;
+    }
+
+    // חיפוש כרטיס לעריכה
+    searchCardForEdit() {
+        const searchInput = document.getElementById('editCardSearchNumber');
+        const formFields = document.getElementById('editCardFormFields');
+        const statusDiv = document.getElementById('editCardStatus');
+        
+        if (!searchInput || !formFields) return;
+        
+        const cardNumber = parseInt(searchInput.value.trim());
+        
+        if (!cardNumber) {
+            if (statusDiv) {
+                statusDiv.textContent = 'יש להכניס מספר כרטיס';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // חפש את הכרטיס
+        const card = this.fuelCards.find(c => c.cardNumber === cardNumber);
+        
+        if (!card) {
+            if (statusDiv) {
+                statusDiv.textContent = 'כרטיס לא נמצא במערכת';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.display = 'block';
+            }
+            formFields.style.display = 'none';
+            return;
+        }
+        
+        // מצא את הכרטיס - מלא את הטופס
+        const cardNumberInput = document.getElementById('editCardNumber');
+        const fuelTypeInput = document.getElementById('editFuelType');
+        const gadudSelect = document.getElementById('editGadudNumber');
+        
+        if (cardNumberInput) cardNumberInput.value = card.cardNumber || '';
+        if (fuelTypeInput) {
+            fuelTypeInput.value = card.fuelType || '';
+            // עדכן את בורר סוג הדלק
+            if (card.fuelType) {
+                const fuelType = card.fuelType.trim();
+                if (fuelType === 'בנזין' || fuelType === 'סולר') {
+                    selectFuelType('editFuelType', fuelType);
+                } else {
+                    selectFuelType('editFuelType', 'other');
+                }
+            }
+        }
+        if (gadudSelect) gadudSelect.value = card.gadudNumber || '';
+        
+        // שמור את מספר הכרטיס המקורי לעריכה
+        formFields.setAttribute('data-original-card-number', cardNumber);
+        
+        // הצג את שדות הטופס
+        formFields.style.display = 'block';
+        
+        if (statusDiv) {
+            statusDiv.textContent = 'כרטיס נמצא - ניתן לערוך';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+            statusDiv.style.display = 'block';
+        }
+    }
+
+    // שליחת טופס עריכה
+    async submitEditCard() {
+        const formFields = document.getElementById('editCardFormFields');
+        const statusDiv = document.getElementById('editCardStatus');
+        
+        if (!formFields || formFields.style.display === 'none') {
+            if (statusDiv) {
+                statusDiv.textContent = 'יש לחפש כרטיס קודם';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        const originalCardNumber = parseInt(formFields.getAttribute('data-original-card-number'));
+        const newCardNumber = parseInt(document.getElementById('editCardNumber').value);
+        const fuelType = document.getElementById('editFuelType').value.trim();
+        const gadudNumber = document.getElementById('editGadudNumber').value;
+        
+        if (!newCardNumber || !fuelType) {
+            if (statusDiv) {
+                statusDiv.textContent = 'יש למלא מספר כרטיס וסוג דלק';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // מצא את הכרטיס
+        const cardIndex = this.fuelCards.findIndex(c => c.cardNumber === originalCardNumber);
+        
+        if (cardIndex === -1) {
+            if (statusDiv) {
+                statusDiv.textContent = 'כרטיס לא נמצא במערכת';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // בדיקה אם מספר הכרטיס החדש כבר קיים (אם שונה)
+        if (newCardNumber !== originalCardNumber) {
+            const existingCard = this.fuelCards.find(c => c.cardNumber === newCardNumber);
+            if (existingCard) {
+                if (statusDiv) {
+                    statusDiv.textContent = 'מספר כרטיס זה כבר קיים במערכת';
+                    statusDiv.style.background = '#f8d7da';
+                    statusDiv.style.color = '#721c24';
+                    statusDiv.style.display = 'block';
+                }
+                return;
+            }
+        }
+        
+        // עדכן את הכרטיס
+        this.fuelCards[cardIndex].cardNumber = newCardNumber;
+        this.fuelCards[cardIndex].fuelType = fuelType;
+        this.fuelCards[cardIndex].gadudNumber = gadudNumber || '';
+        this.fuelCards[cardIndex].date = this.formatDateTime();
+        
+        // שמור ל-Firebase
+        await this.saveDataToFirebase();
+        this.renderTable();
+        
+        // סגור את הטופס
+        this.cancelEditCard();
+        
+        this.showStatus('כרטיס עודכן בהצלחה', 'success');
+    }
+
+    // ביטול עריכה
+    cancelEditCard() {
+        const editForm = document.getElementById('editCardFormDialog');
+        if (editForm) {
+            editForm.style.display = 'none';
+        }
+        document.querySelector('.container').style.display = 'block';
+        this.clearEditCardForm();
+    }
+
+    // ניקוי טופס עריכה
+    clearEditCardForm() {
+        const searchInput = document.getElementById('editCardSearchNumber');
+        const cardNumberInput = document.getElementById('editCardNumber');
+        const fuelTypeInput = document.getElementById('editFuelType');
+        const gadudSelect = document.getElementById('editGadudNumber');
+        const formFields = document.getElementById('editCardFormFields');
+        const statusDiv = document.getElementById('editCardStatus');
+        
+        if (searchInput) searchInput.value = '';
+        if (cardNumberInput) cardNumberInput.value = '';
+        if (fuelTypeInput) {
+            fuelTypeInput.value = '';
+            resetFuelTypeSelector('editFuelType');
+        }
+        if (gadudSelect) gadudSelect.value = '';
+        if (formFields) {
+            formFields.style.display = 'none';
+            formFields.removeAttribute('data-original-card-number');
+        }
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.textContent = '';
+        }
     }
 
     // פונקציות עזר
