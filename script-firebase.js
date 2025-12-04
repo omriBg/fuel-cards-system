@@ -34,6 +34,17 @@ class FuelCardManager {
             this.updateAdminSortingControls();
         }, 1000);
         console.log('המערכת מוכנה לשימוש!');
+        
+        // Fallback: סגור את ה-splash screen אחרי 3 שניות אם הוא עדיין מוצג
+        setTimeout(() => {
+            const splashScreen = document.getElementById('splashScreen');
+            if (splashScreen && splashScreen.style.display !== 'none') {
+                splashScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    splashScreen.style.display = 'none';
+                }, 600);
+            }
+        }, 3000);
     }
 
     formatDateTime(value) {
