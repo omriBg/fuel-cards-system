@@ -1417,7 +1417,12 @@ class FuelCardManager {
     showLoginForm() {
         // הסתר את ה-splash screen
         const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) splashScreen.style.display = 'none';
+        if (splashScreen) {
+            splashScreen.classList.add('fade-out');
+            setTimeout(() => {
+                splashScreen.style.display = 'none';
+            }, 600);
+        }
         
         // הסתר את הממשק הראשי
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
@@ -1431,7 +1436,12 @@ class FuelCardManager {
     showMainInterface() {
         // הסתר את ה-splash screen
         const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) splashScreen.style.display = 'none';
+        if (splashScreen) {
+            splashScreen.classList.add('fade-out');
+            setTimeout(() => {
+                splashScreen.style.display = 'none';
+            }, 600);
+        }
         
         // הסתר טופס התחברות
         const loginForm = document.getElementById('loginForm');
