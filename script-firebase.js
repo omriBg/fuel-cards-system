@@ -1404,9 +1404,12 @@ class FuelCardManager {
     }
 
     checkLogin() {
+        console.log('בודק התחברות, משתמש נוכחי:', this.currentUser);
         if (!this.currentUser) {
+            console.log('אין משתמש מחובר - מציג טופס התחברות');
             this.showLoginForm();
         } else {
+            console.log('משתמש מחובר - מציג ממשק ראשי');
             this.showMainInterface();
         }
     }
@@ -1420,11 +1423,24 @@ class FuelCardManager {
     }
 
     showMainInterface() {
+        console.log('מציג את הממשק הראשי...');
         // הסתר טופס התחברות
-        document.getElementById('loginForm').style.display = 'none';
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.style.display = 'none';
+            console.log('טופס התחברות הוסתר');
+        } else {
+            console.warn('טופס התחברות לא נמצא');
+        }
         
         // הצג את הממשק הראשי
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container');
+        if (container) {
+            container.style.display = 'block';
+            console.log('ממשק ראשי מוצג');
+        } else {
+            console.error('container לא נמצא!');
+        }
         
         // עדכן את הממשק לפי הרשאות המשתמש
         this.updateInterfaceByPermissions();
