@@ -1267,7 +1267,8 @@ class FuelCardManager {
     // הצגת חלונית אישור לזיכוי גדודי
     showGadudCreditConfirmation(cardNumber, gadudCreditDate) {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'none';
         
         // צור/הצג חלונית אישור
         let confirmationDialog = document.getElementById('gadudCreditConfirmationDialog');
@@ -1366,7 +1367,8 @@ class FuelCardManager {
         
         // סגור את החלונית
         dialog.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
         
         // ביצוע הזיכוי
         this.clearGadudData(cardNumber, gadudCreditDate);
@@ -1380,7 +1382,8 @@ class FuelCardManager {
         
         // סגור את החלונית
         dialog.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
         
         // הצג הודעה
         this.showStatus('זיכוי גדודי בוטל', 'error');
@@ -1416,10 +1419,16 @@ class FuelCardManager {
 
     showLoginForm() {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) {
+            container.style.display = 'none';
+        }
         
         // הצג טופס התחברות
-        document.getElementById('loginForm').style.display = 'block';
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.style.display = 'block';
+        }
     }
 
     showMainInterface() {
@@ -1433,8 +1442,8 @@ class FuelCardManager {
             console.warn('טופס התחברות לא נמצא');
         }
         
-        // הצג את הממשק הראשי
-        const container = document.querySelector('.container');
+        // הצג את הממשק הראשי - נסה גם .container וגם #mainContainer
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) {
             container.style.display = 'block';
             console.log('ממשק ראשי מוצג');
@@ -1663,7 +1672,8 @@ class FuelCardManager {
     // הצגת טופס בחירת גדוד אחרי הקלטה קולית
     showGadudSelectionForm(command) {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'none';
         
         // צור/הצג טופס בחירת גדוד
         let gadudForm = document.getElementById('gadudSelectionForm');
@@ -1759,7 +1769,8 @@ class FuelCardManager {
         
         // סגור את הטופס
         gadudForm.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
         
         // המשך עם יצירת הכרטיס
         this.addNewCard(command);
@@ -1768,7 +1779,8 @@ class FuelCardManager {
     cancelGadudSelection() {
         const gadudForm = document.getElementById('gadudSelectionForm');
         gadudForm.style.display = 'none';
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
         this.showStatus('ניפוק הכרטיס בוטל', 'error');
     }
 
@@ -1927,7 +1939,8 @@ class FuelCardManager {
     // הצגת חלונית אימות סיסמה לעריכה
     showEditCardPasswordDialog() {
         // הסתר את הממשק הראשי
-        document.querySelector('.container').style.display = 'none';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'none';
         
         // צור/הצג חלונית סיסמה
         let passwordDialog = document.getElementById('editCardPasswordDialog');
@@ -2048,7 +2061,8 @@ class FuelCardManager {
         if (passwordDialog) {
             passwordDialog.style.display = 'none';
         }
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
     }
 
     // הצגת טופס עריכת כרטיס
@@ -2345,7 +2359,8 @@ class FuelCardManager {
         if (editForm) {
             editForm.style.display = 'none';
         }
-        document.querySelector('.container').style.display = 'block';
+        const container = document.querySelector('.container') || document.getElementById('mainContainer');
+        if (container) container.style.display = 'block';
         this.clearEditCardForm();
     }
 
