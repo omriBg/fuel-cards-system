@@ -34,6 +34,15 @@ class FuelCardManager {
             this.updateAdminSortingControls();
         }, 1000);
         console.log('המערכת מוכנה לשימוש!');
+        
+        // הסתר את ה-splash screen אחרי שהמערכת נטענה
+        setTimeout(() => {
+            const splashScreen = document.getElementById('splashScreen');
+            if (splashScreen && splashScreen.style.display !== 'none') {
+                splashScreen.style.display = 'none';
+                console.log('Splash screen הוסתר אחרי טעינת המערכת');
+            }
+        }, 2000);
     }
 
     formatDateTime(value) {
