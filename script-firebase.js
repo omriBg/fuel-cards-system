@@ -1418,6 +1418,13 @@ class FuelCardManager {
     }
 
     showLoginForm() {
+        // הסתר את ה-splash screen
+        const splashScreen = document.getElementById('splashScreen');
+        if (splashScreen) {
+            splashScreen.style.display = 'none';
+            console.log('Splash screen הוסתר (בטופס התחברות)');
+        }
+        
         // הסתר את הממשק הראשי
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) {
@@ -1433,6 +1440,14 @@ class FuelCardManager {
 
     showMainInterface() {
         console.log('מציג את הממשק הראשי...');
+        
+        // הסתר את ה-splash screen
+        const splashScreen = document.getElementById('splashScreen');
+        if (splashScreen) {
+            splashScreen.style.display = 'none';
+            console.log('Splash screen הוסתר');
+        }
+        
         // הסתר טופס התחברות
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
