@@ -1079,6 +1079,17 @@
                     font-size: 14px;
                     display: none;
                 ">פאנל מנהל</button>
+                <button onclick="fuelCardManager.showEditCardForm()" id="editCardBtn" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    padding: 8px 15px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                    font-size: 14px;
+                    display: none;
+                ">עריכת כרטיס</button>
                 <button onclick="fuelCardManager.logout()" style="
                     background: rgba(255,255,255,0.2);
                     color: white;
@@ -1641,8 +1652,8 @@
         window.onAuthStateChanged = onAuthStateChanged;
         window.signOut = signOut;
         
-        // ודא ש-Firebase מוכן לפני טעינת script.js
-        console.log('Firebase initialized, loading script.js...');
+        // ודא ש-Firebase מוכן לפני טעינת script-firebase.js
+        console.log('Firebase initialized, loading script-firebase.js...');
         window.firebaseReady = true;
         
         // פונקציה לטעינת ספריית SheetJS
@@ -1674,9 +1685,9 @@
             });
         };
         
-        // טען את script.js רק אחרי ש-Firebase מוכן
+        // טען את script-firebase.js רק אחרי ש-Firebase מוכן
         const script = document.createElement('script');
-        script.src = 'script.js';
+        script.src = 'script-firebase.js';
         script.type = 'text/javascript';
         script.async = false;
         document.body.appendChild(script);
