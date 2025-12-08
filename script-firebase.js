@@ -588,10 +588,24 @@ class FuelCardManager {
         const card = this.fuelCards[cardIndex];
 
         // דרישה: ניתן להחזיר רק אחרי זיכוי גדודי מלא → remainingFuel חייב להיות 0
+        // אם יש נתונים גדודיים (gadudName, gadudId, או gadudNumber), חייבים לוודא:
+        // 1. שזיכוי גדודי בוצע (gadudCreditDate קיים)
+        // 2. שהכמות שנותרה היא בדיוק 0
         if (card.gadudName || card.gadudId || card.gadudNumber) {
-            const remaining = Number(card.remainingFuel);
-            if (Number.isNaN(remaining) || remaining > 0) {
+            // בדיקה אם יש כמות שנותרה שלא 0
+            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
+                ? Number(card.remainingFuel) 
+                : null;
+            
+            // אם יש כמות שנותרה והיא לא 0 - לא ניתן להחזיר
+            if (remaining !== null && (Number.isNaN(remaining) || remaining !== 0)) {
                 this.showStatus('לא ניתן להחזיר כרטיס לפני זיכוי גדודי מלא (כמות שנותרה חייבת להיות 0)', 'error');
+                return;
+            }
+            
+            // בדיקה אם זיכוי גדודי בוצע (gadudCreditDate קיים)
+            if (!card.gadudCreditDate) {
+                this.showStatus('לא ניתן להחזיר כרטיס לפני ביצוע זיכוי גדודי (חובה לתעד תאריך זיכוי גדודי)', 'error');
                 return;
             }
         }
@@ -892,20 +906,83 @@ class FuelCardManager {
         return sortedCards;
     }
     
-    // פונקציה להשוואת תאריכים
+    // פונקציה לעיבוד מחרוזת תאריך לפורמטים שונים
+    parseDateString(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        
+        // ניקוי רווחים
+        const cleaned = dateStr.trim();
+        if (!cleaned) return null;
+        
+        // ניסיון ראשון: Date רגיל (ISO format, או פורמט סטנדרטי)
+        const direct = new Date(cleaned);
+        if (!isNaN(direct.getTime())) return direct;
+        
+        // ניסיון לפורמט dd/mm/yyyy או dd-mm-yyyy או dd.mm.yyyy
+        // עם או בלי שעה: hh:mm או hh:mm:ss
+        const datePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
+        const match = cleaned.match(datePattern);
+        
+        if (match) {
+            const day = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) - 1; // חודשים ב-JS הם 0-11
+            let year = parseInt(match[3], 10);
+            
+            // אם השנה היא 2 ספרות, נניח שזה 20XX
+            if (year < 100) {
+                year = 2000 + year;
+            }
+            
+            const hour = match[4] ? parseInt(match[4], 10) : 0;
+            const minute = match[5] ? parseInt(match[5], 10) : 0;
+            const second = match[6] ? parseInt(match[6], 10) : 0;
+            
+            const parsed = new Date(year, month, day, hour, minute, second);
+            if (!isNaN(parsed.getTime())) return parsed;
+        }
+        
+        // ניסיון לפורמט yyyy-mm-dd
+        const isoPattern = /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/;
+        const isoMatch = cleaned.match(isoPattern);
+        if (isoMatch) {
+            const year = parseInt(isoMatch[1], 10);
+            const month = parseInt(isoMatch[2], 10) - 1;
+            const day = parseInt(isoMatch[3], 10);
+            const parsed = new Date(year, month, day);
+            if (!isNaN(parsed.getTime())) return parsed;
+        }
+        
+        return null;
+    }
+
+    // פונקציה להשוואת תאריכים (משופרת)
     compareDates(dateA, dateB) {
         if (!dateA && !dateB) return 0;
         if (!dateA) return 1;
         if (!dateB) return -1;
         
-        const dateAObj = new Date(dateA);
-        const dateBObj = new Date(dateB);
+        // ניסיון לפרסר את התאריכים
+        const parsedA = this.parseDateString(dateA);
+        const parsedB = this.parseDateString(dateB);
         
-        if (isNaN(dateAObj.getTime()) && isNaN(dateBObj.getTime())) return 0;
-        if (isNaN(dateAObj.getTime())) return 1;
-        if (isNaN(dateBObj.getTime())) return -1;
+        // אם שניהם לא הצליחו לפרסר, ננסה Date רגיל
+        if (!parsedA && !parsedB) {
+            const dateAObj = new Date(dateA);
+            const dateBObj = new Date(dateB);
+            
+            if (isNaN(dateAObj.getTime()) && isNaN(dateBObj.getTime())) return 0;
+            if (isNaN(dateAObj.getTime())) return 1;
+            if (isNaN(dateBObj.getTime())) return -1;
+            
+            return dateAObj.getTime() - dateBObj.getTime();
+        }
         
-        return dateAObj.getTime() - dateBObj.getTime();
+        // אם אחד מהם לא הצליח לפרסר
+        if (!parsedA) return 1;
+        if (!parsedB) return -1;
+        
+        // השוואה בין תאריכים מפורסרים
+        return parsedA.getTime() - parsedB.getTime();
     }
     
     // החלת מיון וסינון
