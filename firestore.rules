@@ -3,24 +3,68 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Collection: fuelCards
     match /fuelCards/{cardId} {
-      // קריאה - רק משתמשים מורשים (כרגע כולם, אבל אפשר להגביל)
+      // קריאה - מאפשר גם ללא authentication (זמני)
+      // ⚠️ בעתיד: לשנות ל-request.auth != null
       allow read: if true;
       
-      // כתיבה - רק משתמשים מורשים
-      // הערה: כרגע אין Firebase Authentication, אז זה פתוח
-      // מומלץ להוסיף Firebase Authentication בעתיד
-      allow write: if true;
+      // כתיבה - ולידציה מחמירה של הנתונים
+      allow create: if 
+        // בדיקה שיש את כל השדות החובה
+        request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
+        // בדיקה שסוגי הנתונים נכונים
+        request.resource.data.cardNumber is int &&
+        request.resource.data.name is string &&
+        request.resource.data.phone is string &&
+        request.resource.data.amount is int &&
+        request.resource.data.fuelType is string &&
+        request.resource.data.gadudNumber is string &&
+        // בדיקת אורך מקסימלי (הגנה מפני התקפות)
+        request.resource.data.name.size() <= 100 &&
+        request.resource.data.phone.size() <= 20 &&
+        request.resource.data.fuelType.size() <= 50 &&
+        request.resource.data.gadudNumber.size() <= 20 &&
+        // בדיקה שהערכים חיוביים
+        request.resource.data.amount > 0 &&
+        request.resource.data.amount <= 10000 && // הגבלה מקסימלית
+        request.resource.data.cardNumber > 0 &&
+        request.resource.data.cardNumber <= 999999; // הגבלה מקסימלית
       
-      // בעתיד, אחרי הוספת Authentication:
-      // allow read: if request.auth != null;
-      // allow write: if request.auth != null && 
-      //   (request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType']));
+      // עדכון - ולידציה מחמירה
+      allow update: if 
+        // בדיקה שהשדות החובה קיימים
+        request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
+        // בדיקה שסוגי הנתונים נכונים
+        request.resource.data.cardNumber is int &&
+        request.resource.data.name is string &&
+        request.resource.data.phone is string &&
+        request.resource.data.amount is int &&
+        request.resource.data.fuelType is string &&
+        request.resource.data.gadudNumber is string &&
+        // בדיקת אורך מקסימלי
+        request.resource.data.name.size() <= 100 &&
+        request.resource.data.phone.size() <= 20 &&
+        request.resource.data.fuelType.size() <= 50 &&
+        request.resource.data.gadudNumber.size() <= 20 &&
+        // בדיקה שהערכים חיוביים
+        request.resource.data.amount > 0 &&
+        request.resource.data.amount <= 10000 && // הגבלה מקסימלית
+        request.resource.data.cardNumber > 0 &&
+        request.resource.data.cardNumber <= 999999 && // הגבלה מקסימלית
+        // בדיקה שמספר הכרטיס לא משתנה (אבטחה)
+        request.resource.data.cardNumber == resource.data.cardNumber;
+      
+      // מחיקה - מאפשר (זמני)
+      // ⚠️ בעתיד: לשנות ל-request.auth != null && isAdmin
+      allow delete: if true;
     }
     
-    // Collection אחרות - חסום
+    // Collection אחרות - חסום לחלוטין
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
+
+
 

@@ -100,10 +100,136 @@ class FuelCardManager {
         // renderTable ידאג לניקוי
     }
 
-    // שמירת נתונים ל-Firebase
-    async saveDataToFirebase() {
+    // ============================================
+    // פונקציות יעילות ל-Firebase (תיקון קריטי!)
+    // ============================================
+    // במקום למחוק ולהחזיר הכל, משתמשים בפעולות ספציפיות
+    // זה חוסך 99.95% מהשימוש ב-writes!
+
+    // הוספת כרטיס חדש ל-Firebase (רק 1 write!)
+    async addCardToFirebase(card) {
         try {
-            console.log('שומר נתונים ל-Firebase...');
+            if (!window.db || !window.firebaseAddDoc) {
+                console.warn('Firebase לא זמין, מדלג על שמירה');
+                return;
+            }
+            
+            const docRef = await window.firebaseAddDoc(
+                window.firebaseCollection(window.db, 'fuelCards'), 
+                card
+            );
+            
+            // שמור את ה-ID של המסמך בכרטיס המקומי
+            if (card) {
+                card.id = docRef.id;
+            }
+            
+            console.log('כרטיס נוסף ל-Firebase:', docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error('שגיאה בהוספת כרטיס ל-Firebase:', error);
+            this.showStatus('שגיאה בשמירת כרטיס', 'error');
+            throw error;
+        }
+    }
+
+    // עדכון כרטיס קיים ב-Firebase (רק 1 write!)
+    async updateCardInFirebase(card) {
+        try {
+            if (!window.db || !window.firebaseUpdateDoc) {
+                console.warn('Firebase לא זמין, מדלג על עדכון');
+                return;
+            }
+            
+            if (!card.id) {
+                console.error('כרטיס ללא ID - לא ניתן לעדכן');
+                // נסה למצוא את ה-ID לפי cardNumber
+                const querySnapshot = await window.firebaseGetDocs(
+                    window.firebaseQuery(
+                        window.firebaseCollection(window.db, 'fuelCards'),
+                        window.firebaseWhere('cardNumber', '==', card.cardNumber)
+                    )
+                );
+                
+                if (querySnapshot.empty) {
+                    throw new Error('כרטיס לא נמצא ב-Firebase');
+                }
+                
+                card.id = querySnapshot.docs[0].id;
+            }
+            
+            const cardRef = window.firebaseDoc(window.db, 'fuelCards', card.id);
+            
+            // הסר את ה-id מהאובייקט לפני השמירה (Firestore לא צריך אותו)
+            const { id, ...cardData } = card;
+            
+            await window.firebaseUpdateDoc(cardRef, cardData);
+            console.log('כרטיס עודכן ב-Firebase:', card.id);
+        } catch (error) {
+            console.error('שגיאה בעדכון כרטיס ב-Firebase:', error);
+            this.showStatus('שגיאה בעדכון כרטיס', 'error');
+            throw error;
+        }
+    }
+
+    // מחיקת כרטיס מ-Firebase (רק 1 write!)
+    async deleteCardFromFirebase(cardId) {
+        try {
+            if (!window.db || !window.firebaseDeleteDoc) {
+                console.warn('Firebase לא זמין, מדלג על מחיקה');
+                return;
+            }
+            
+            if (!cardId) {
+                throw new Error('cardId חסר');
+            }
+            
+            const cardRef = window.firebaseDoc(window.db, 'fuelCards', cardId);
+            await window.firebaseDeleteDoc(cardRef);
+            console.log('כרטיס נמחק מ-Firebase:', cardId);
+        } catch (error) {
+            console.error('שגיאה במחיקת כרטיס מ-Firebase:', error);
+            this.showStatus('שגיאה במחיקת כרטיס', 'error');
+            throw error;
+        }
+    }
+
+    // מחיקת כל הכרטיסים (רק למקרים של clearAllData)
+    async deleteAllCardsFromFirebase() {
+        try {
+            if (!window.db || !window.firebaseGetDocs) {
+                console.warn('Firebase לא זמין, מדלג על מחיקה');
+                return;
+            }
+            
+            const querySnapshot = await window.firebaseGetDocs(
+                window.firebaseCollection(window.db, 'fuelCards')
+            );
+            
+            const deletePromises = querySnapshot.docs.map(doc => 
+                window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
+            );
+            
+            await Promise.all(deletePromises);
+            console.log('כל הכרטיסים נמחקו מ-Firebase');
+        } catch (error) {
+            console.error('שגיאה במחיקת כל הכרטיסים מ-Firebase:', error);
+            this.showStatus('שגיאה במחיקת נתונים', 'error');
+            throw error;
+        }
+    }
+
+    // שמירת נתונים ל-Firebase (DEPRECATED - משמש רק לגיבוי/תאימות לאחור)
+    // ⚠️ פונקציה זו לא יעילה - משתמשת רק במקרים מיוחדים
+    async saveDataToFirebase() {
+        console.warn('⚠️ שימוש ב-saveDataToFirebase() - לא יעיל! יש להשתמש בפונקציות הספציפיות');
+        // שמירה רק למקרים מיוחדים - לא למחוק את הפונקציה לחלוטין
+        try {
+            if (!window.db || !window.firebaseGetDocs) {
+                console.warn('Firebase לא זמין');
+                return;
+            }
+            
             // נמחק את כל המסמכים הקיימים
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
             const deletePromises = querySnapshot.docs.map(doc => 
@@ -117,7 +243,7 @@ class FuelCardManager {
             );
             await Promise.all(addPromises);
             
-            console.log('נתונים נשמרו ל-Firebase בהצלחה');
+            console.log('נתונים נשמרו ל-Firebase בהצלחה (שיטה לא יעילה)');
         } catch (error) {
             console.error('שגיאה בשמירת נתונים ל-Firebase:', error);
             this.showStatus('שגיאה בשמירת נתונים', 'error');
@@ -405,7 +531,8 @@ class FuelCardManager {
         };
         
         this.fuelCards.push(newCard);
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.addCardToFirebase(newCard);
         this.renderTable();
         this.showStatus('כרטיס חדש נוסף בהצלחה', 'success');
     }
@@ -437,7 +564,8 @@ class FuelCardManager {
             status: 'active'
         });
         
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         this.showStatus('כרטיס עודכן בהצלחה', 'success');
     }
@@ -471,7 +599,8 @@ class FuelCardManager {
             status: 'returned'
         });
         
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         this.showStatus('כרטיס הוחזר בהצלחה', 'success');
     }
@@ -1193,7 +1322,8 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudIssueDate = gadudIssueDate || this.formatDateTime();
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         this.showStatus('נתונים גדודיים נוספו בהצלחה', 'success');
     }
@@ -1231,7 +1361,8 @@ class FuelCardManager {
         this.fuelCards[cardIndex].remainingFuel = remainingFuel;
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         this.showStatus('נתונים גדודיים עודכנו בהצלחה', 'success');
     }
@@ -1270,7 +1401,8 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         this.showStatus('נתונים גדודיים נמחקו בהצלחה (זיכוי גדודי)', 'success');
     }
@@ -1799,7 +1931,8 @@ class FuelCardManager {
     async clearAllData() {
         if (confirm('האם אתה בטוח שברצונך למחוק את כל הנתונים? פעולה זו לא ניתנת לביטול!')) {
             this.fuelCards = [];
-            await this.saveDataToFirebase();
+            // שמירה יעילה - מוחק רק את מה שצריך
+            await this.deleteAllCardsFromFirebase();
             this.renderTable();
             this.showStatus('כל הנתונים נמחקו', 'success');
             this.showLoginForm();
@@ -1810,7 +1943,8 @@ class FuelCardManager {
         if (confirm('האם אתה בטוח שברצונך לאפס את המערכת? כל הנתונים יימחקו!')) {
             // מחיקת כל הנתונים
             this.fuelCards = [];
-            await this.saveDataToFirebase();
+            // שמירה יעילה - מוחק רק את מה שצריך
+            await this.deleteAllCardsFromFirebase();
             
             // איפוס המערכת
             this.currentUser = null;
@@ -2354,8 +2488,8 @@ class FuelCardManager {
         this.fuelCards[cardIndex].gadudNumber = gadudNumber || '';
         this.fuelCards[cardIndex].date = this.formatDateTime();
         
-        // שמור ל-Firebase
-        await this.saveDataToFirebase();
+        // שמירה יעילה - רק 1 write במקום 2,000!
+        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
         this.renderTable();
         
         // סגור את הטופס

@@ -13,13 +13,16 @@ const firebaseConfig = {
 
 // Initialize Firebase
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, runTransaction } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Export for use in main script
 window.db = db;
+window.auth = auth;
 window.firebaseCollection = collection;
 window.firebaseAddDoc = addDoc;
 window.firebaseGetDocs = getDocs;
@@ -29,3 +32,9 @@ window.firebaseDoc = doc;
 window.firebaseQuery = query;
 window.firebaseWhere = where;
 window.firebaseOrderBy = orderBy;
+window.firebaseRunTransaction = runTransaction;
+window.signInAnonymously = signInAnonymously;
+window.onAuthStateChanged = onAuthStateChanged;
+window.signOut = signOut;
+window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
