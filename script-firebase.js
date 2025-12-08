@@ -587,12 +587,11 @@ class FuelCardManager {
 
         const card = this.fuelCards[cardIndex];
 
-        // דרישה: ניתן להחזיר רק אם בוצע זיכוי גדודי מלא (remainingFuel == 0)
-        // אם יש נתונים גדודיים, חייבים לוודא שהכמות שנותרה היא 0
-        if ((card.gadudName || card.gadudId || card.gadudNumber) && typeof card.remainingFuel !== 'undefined') {
+        // דרישה: ניתן להחזיר רק אחרי זיכוי גדודי מלא → remainingFuel חייב להיות 0
+        if (card.gadudName || card.gadudId || card.gadudNumber) {
             const remaining = Number(card.remainingFuel);
-            if (!Number.isNaN(remaining) && remaining > 0) {
-                this.showStatus('לא ניתן להחזיר כרטיס לפני שזיכוי גדודי אפס את הכמות (0 ליטר)', 'error');
+            if (Number.isNaN(remaining) || remaining > 0) {
+                this.showStatus('לא ניתן להחזיר כרטיס לפני זיכוי גדודי מלא (כמות שנותרה חייבת להיות 0)', 'error');
                 return;
             }
         }
