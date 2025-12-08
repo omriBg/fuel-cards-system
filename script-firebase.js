@@ -1134,13 +1134,24 @@ class FuelCardManager {
             return;
         }
 
-        modal.classList.remove('status-modal--visible');
-        modal.classList.add('status-modal--hidden');
-        modal.setAttribute('aria-hidden', 'true');
-
+        // בטל כל timeout פעיל
         if (this.statusModalTimeout) {
             clearTimeout(this.statusModalTimeout);
             this.statusModalTimeout = null;
+        }
+
+        // הסתר את ה-modal
+        modal.classList.remove('status-modal--visible');
+        modal.classList.add('status-modal--hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        
+        // גם דרך style.display למקרה שה-CSS לא עובד
+        modal.style.display = 'none';
+        
+        // נקה את התוכן
+        const messageEl = document.getElementById('statusModalMessage');
+        if (messageEl) {
+            messageEl.textContent = '';
         }
     }
 
@@ -1598,6 +1609,11 @@ class FuelCardManager {
         
         // סגור את החלונית
         dialog.style.display = 'none';
+        // הסתר גם את הרקע
+        const backdrop = dialog.querySelector('div[style*="position: fixed"]');
+        if (backdrop) {
+            backdrop.style.display = 'none';
+        }
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) container.style.display = 'block';
         
@@ -1613,6 +1629,11 @@ class FuelCardManager {
         
         // סגור את החלונית
         dialog.style.display = 'none';
+        // הסתר גם את הרקע
+        const backdrop = dialog.querySelector('div[style*="position: fixed"]');
+        if (backdrop) {
+            backdrop.style.display = 'none';
+        }
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) container.style.display = 'block';
         
@@ -2236,6 +2257,11 @@ class FuelCardManager {
         const passwordDialog = document.getElementById('editCardPasswordDialog');
         if (passwordDialog) {
             passwordDialog.style.display = 'none';
+            // הסתר גם את הרקע
+            const backdrop = passwordDialog.querySelector('div[style*="position: fixed"]');
+            if (backdrop) {
+                backdrop.style.display = 'none';
+            }
         }
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) container.style.display = 'block';
@@ -2534,6 +2560,11 @@ class FuelCardManager {
         const editForm = document.getElementById('editCardFormDialog');
         if (editForm) {
             editForm.style.display = 'none';
+            // גם הסתר את הרקע
+            const backdrop = editForm.querySelector('div[style*="position: fixed"]');
+            if (backdrop) {
+                backdrop.style.display = 'none';
+            }
         }
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) container.style.display = 'block';
