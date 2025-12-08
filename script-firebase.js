@@ -584,23 +584,35 @@ class FuelCardManager {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
             return;
         }
+
+        const card = this.fuelCards[cardIndex];
+
+        // דרישה: ניתן להחזיר רק אם בוצע זיכוי גדודי מלא (remainingFuel == 0)
+        // אם יש נתונים גדודיים, חייבים לוודא שהכמות שנותרה היא 0
+        if ((card.gadudName || card.gadudId || card.gadudNumber) && typeof card.remainingFuel !== 'undefined') {
+            const remaining = Number(card.remainingFuel);
+            if (!Number.isNaN(remaining) && remaining > 0) {
+                this.showStatus('לא ניתן להחזיר כרטיס לפני שזיכוי גדודי אפס את הכמות (0 ליטר)', 'error');
+                return;
+            }
+        }
         
-        this.fuelCards[cardIndex].status = 'returned';
-        this.fuelCards[cardIndex].date = this.formatDateTime();
+        card.status = 'returned';
+        card.date = this.formatDateTime();
         // שמירת תאריך זיכוי
         const creditDate = command.creditDate || this.formatDateTime();
-        this.fuelCards[cardIndex].creditDate = creditDate;
+        card.creditDate = creditDate;
         
         // הוסף לשרשרת העברת כרטיס
-        this.fuelCards[cardIndex].cardChain.push({
+        card.cardChain.push({
             action: 'החזרת כרטיס',
-            amount: this.fuelCards[cardIndex].amount,
+            amount: card.amount,
             date: this.formatDateTime(),
             status: 'returned'
         });
         
         // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
+        await this.updateCardInFirebase(card);
         this.renderTable();
         this.showStatus('כרטיס הוחזר בהצלחה', 'success');
     }
