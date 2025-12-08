@@ -25,9 +25,9 @@ service cloud.firestore {
         request.resource.data.gadudNumber.size() <= 20 &&
         // בדיקה שהערכים חיוביים
         request.resource.data.amount > 0 &&
-        request.resource.data.amount <= 10000 && // הגבלה מקסימלית
+        request.resource.data.amount <= 100000 && // הגבלה מקסימלית נדיבה
         request.resource.data.cardNumber > 0 &&
-        request.resource.data.cardNumber <= 999999; // הגבלה מקסימלית
+        request.resource.data.cardNumber <= 999999999999; // תקרת מספר כרטיס גבוהה למניעת חסימה
       
       // עדכון - ולידציה מחמירה
       allow update: if 
@@ -47,9 +47,9 @@ service cloud.firestore {
         request.resource.data.gadudNumber.size() <= 20 &&
         // בדיקה שהערכים חיוביים
         request.resource.data.amount > 0 &&
-        request.resource.data.amount <= 10000 && // הגבלה מקסימלית
+        request.resource.data.amount <= 100000 && // הגבלה מקסימלית נדיבה
         request.resource.data.cardNumber > 0 &&
-        request.resource.data.cardNumber <= 999999 && // הגבלה מקסימלית
+        request.resource.data.cardNumber <= 999999999999 && // תקרת מספר כרטיס גבוהה למניעת חסימה
         // בדיקה שמספר הכרטיס לא משתנה (אבטחה)
         request.resource.data.cardNumber == resource.data.cardNumber;
       
