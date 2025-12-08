@@ -1927,37 +1927,6 @@ class FuelCardManager {
         this.showStatus('ניפוק הכרטיס בוטל', 'error');
     }
 
-    // פונקציות לניהול המערכת
-    async clearAllData() {
-        if (confirm('האם אתה בטוח שברצונך למחוק את כל הנתונים? פעולה זו לא ניתנת לביטול!')) {
-            this.fuelCards = [];
-            // שמירה יעילה - מוחק רק את מה שצריך
-            await this.deleteAllCardsFromFirebase();
-            this.renderTable();
-            this.showStatus('כל הנתונים נמחקו', 'success');
-            this.showLoginForm();
-        }
-    }
-
-    async resetSystem() {
-        if (confirm('האם אתה בטוח שברצונך לאפס את המערכת? כל הנתונים יימחקו!')) {
-            // מחיקת כל הנתונים
-            this.fuelCards = [];
-            // שמירה יעילה - מוחק רק את מה שצריך
-            await this.deleteAllCardsFromFirebase();
-            
-            // איפוס המערכת
-            this.currentUser = null;
-            this.tableColumns = this.loadTableColumns();
-            
-            // רענון הממשק
-            this.renderTable();
-            this.showLoginForm();
-            
-            this.showStatus('המערכת אופסה בהצלחה', 'success');
-        }
-    }
-
     // פונקציה להצגת פאנל מנהל
     showAdminPanel() {
         if (!this.currentUser || !this.currentUser.isAdmin) {
@@ -1989,32 +1958,6 @@ class FuelCardManager {
                     min-width: 500px;
                 ">
                     <h2 style="color: #2c3e50; margin-bottom: 30px;">פאנל מנהל</h2>
-                    <div style="margin-bottom: 20px;">
-                        <button onclick="fuelCardManager.clearAllData()" style="
-                            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            margin: 10px;
-                            width: 100%;
-                        ">מחק כל הנתונים</button>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <button onclick="fuelCardManager.resetSystem()" style="
-                            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            margin: 10px;
-                            width: 100%;
-                        ">אפס מערכת</button>
-                    </div>
                     <div style="margin-bottom: 20px;">
                         <button onclick="fuelCardManager.showSystemInfo()" style="
                             background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
