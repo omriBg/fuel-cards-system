@@ -1112,6 +1112,9 @@ class FuelCardManager {
         }
         messageEl.textContent = message;
 
+        // ודא שהתיבה מוצגת לפני החלת מחלקות האנימציה
+        modal.style.display = 'flex';
+
         modal.setAttribute('data-status-type', statusType);
         modal.classList.remove('status-modal--hidden');
         modal.classList.add('status-modal--visible');
@@ -1145,8 +1148,9 @@ class FuelCardManager {
         modal.classList.add('status-modal--hidden');
         modal.setAttribute('aria-hidden', 'true');
         
-        // גם דרך style.display למקרה שה-CSS לא עובד
-        modal.style.display = 'none';
+        // גם דרך style.display למקרה שה-CSS לא עובד.
+        // מאפס ל-empty כדי שהפתיחה הבאה תחזיר את display המקורי (flex מה-CSS).
+        modal.style.display = '';
         
         // נקה את התוכן
         const messageEl = document.getElementById('statusModalMessage');

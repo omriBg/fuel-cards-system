@@ -1014,6 +1014,9 @@ class FuelCardManager {
         }
         messageEl.textContent = message;
 
+        // ודא שהתיבה מוצגת לפני החלת מחלקות האנימציה
+        modal.style.display = 'flex';
+
         modal.setAttribute('data-status-type', statusType);
         modal.classList.remove('status-modal--hidden');
         modal.classList.add('status-modal--visible');
@@ -1045,6 +1048,9 @@ class FuelCardManager {
             clearTimeout(this.statusModalTimeout);
             this.statusModalTimeout = null;
         }
+
+        // מאפס את ה-display כדי שהפתיחה הבאה תחזיר את ערך ה-CSS (flex).
+        modal.style.display = '';
     }
 
     handleStatusModalKeydown(event) {
