@@ -3006,15 +3006,15 @@ function submitGadudNew() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    // בדיקת ולידציה של מספר כרטיס (5 עד 15 ספרות)
     const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+    if (!/^\d{5,15}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להכיל בין 5 ל-15 ספרות בלבד', 'error');
         return;
     }
     const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+    if (cardNum < 10000 || cardNum > 999999999999999) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להיות בין 10000 ל-999999999999999 (5 עד 15 ספרות)', 'error');
         return;
     }
     
@@ -3044,15 +3044,15 @@ function submitGadudUpdate() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    // בדיקת ולידציה של מספר כרטיס (5 עד 15 ספרות)
     const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+    if (!/^\d{5,15}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להכיל בין 5 ל-15 ספרות בלבד', 'error');
         return;
     }
     const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+    if (cardNum < 10000 || cardNum > 999999999999999) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להיות בין 10000 ל-999999999999999 (5 עד 15 ספרות)', 'error');
         return;
     }
     
@@ -3081,15 +3081,15 @@ function submitGadudReturn() {
         return;
     }
     
-    // בדיקת ולידציה של מספר רכב (7 או 8 ספרות)
+    // בדיקת ולידציה של מספר כרטיס (5 עד 15 ספרות)
     const cardNumStr = cardNumber.toString().trim();
-    if (!/^\d{7,8}$/.test(cardNumStr)) {
-        fuelCardManager.showStatus('מספר רכב חייב להכיל 7 או 8 ספרות בלבד', 'error');
+    if (!/^\d{5,15}$/.test(cardNumStr)) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להכיל בין 5 ל-15 ספרות בלבד', 'error');
         return;
     }
     const cardNum = parseInt(cardNumStr);
-    if (cardNum < 1000000 || cardNum > 99999999) {
-        fuelCardManager.showStatus('מספר רכב חייב להיות בין 1000000 ל-99999999 (7 או 8 ספרות)', 'error');
+    if (cardNum < 10000 || cardNum > 999999999999999) {
+        fuelCardManager.showStatus('מספר כרטיס חייב להיות בין 10000 ל-999999999999999 (5 עד 15 ספרות)', 'error');
         return;
     }
     
