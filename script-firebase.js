@@ -1931,6 +1931,12 @@ class FuelCardManager {
             batchCreditBtn.style.display = user.isAdmin ? 'block' : 'none';
         }
 
+        // כפתור החזרה רצף - רק למנהל
+        const batchReturnBtn = document.getElementById('batchReturnBtn');
+        if (batchReturnBtn) {
+            batchReturnBtn.style.display = user.isAdmin ? 'block' : 'none';
+        }
+
         // מצא את כל ה-control-card divs של ניפוק/עדכון/החזרת כרטיס
         const controlCards = document.querySelectorAll('.control-card');
         const adminControlCards = [];
@@ -2379,6 +2385,242 @@ class FuelCardManager {
             this.showStatus(`זיכוי הושלם בהצלחה! ${successCount} כרטיסים זוכו.`, 'success');
         } else {
             const errorMsg = `זיכוי הושלם חלקית: ${successCount} כרטיסים זוכו, ${errorCount} שגיאות.\n${errors.join('\n')}`;
+            this.showStatus(errorMsg, 'error');
+        }
+    }
+
+    // החזרה רצף - פתיחת modal
+    showBatchReturnModal() {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה לבצע החזרה רצף. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('batchReturnModal');
+        if (modal) {
+            modal.style.display = 'block';
+            // נקה את הבחירה הקודמת
+            document.getElementById('batchReturnGadud').value = '';
+            document.getElementById('batchReturnCardsList').innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
+            document.getElementById('executeBatchReturnBtn').style.display = 'none';
+        }
+    }
+
+    // החזרה רצף - סגירת modal
+    closeBatchReturnModal() {
+        const modal = document.getElementById('batchReturnModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // החזרה רצף - טעינת כרטיסים לפי גדוד
+    loadCardsForBatchReturn() {
+        const gadud = document.getElementById('batchReturnGadud').value;
+        const cardsList = document.getElementById('batchReturnCardsList');
+        const executeBtn = document.getElementById('executeBatchReturnBtn');
+
+        if (!gadud) {
+            cardsList.innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
+            executeBtn.style.display = 'none';
+            return;
+        }
+
+        // סנן כרטיסים: שייכים לגדוד, יש להם gadudCreditDate (זוכו גדודית), 
+        // remainingFuel = 0 (אין דלק שנותר), ולא הוחזרו לגמרי
+        const eligibleCards = this.fuelCards.filter(card => {
+            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
+                ? Number(card.remainingFuel) 
+                : null;
+            return card.gadudNumber === gadud && 
+                   card.gadudCreditDate && 
+                   (remaining === null || remaining === 0) &&
+                   card.status !== 'returned' && 
+                   card.status !== 'final_return';
+        });
+
+        if (eligibleCards.length === 0) {
+            cardsList.innerHTML = '<p style="text-align: center; color: #666;">לא נמצאו כרטיסים להחזרה בגדוד זה (צריך זיכוי גדודי מלא - כמות שנותרה = 0)</p>';
+            executeBtn.style.display = 'none';
+            return;
+        }
+
+        // צור רשימה עם checkboxes
+        let html = '<div style="direction: rtl;">';
+        html += `<h4 style="margin-bottom: 15px; color: #2c3e50;">נמצאו ${eligibleCards.length} כרטיסים להחזרה:</h4>`;
+        html += '<div style="max-height: 350px; overflow-y: auto;">';
+        
+        eligibleCards.forEach((card, index) => {
+            const cardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
+            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
+                ? Number(card.remainingFuel) 
+                : 0;
+            html += `
+                <div style="
+                    padding: 12px;
+                    margin-bottom: 8px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    background: #f9f9f9;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                ">
+                    <input 
+                        type="checkbox" 
+                        id="batchReturnCard_${cardNum}" 
+                        value="${cardNum}"
+                        style="width: 20px; height: 20px; cursor: pointer;"
+                        onchange="fuelCardManager.updateBatchReturnButton()"
+                    >
+                    <label for="batchReturnCard_${cardNum}" style="flex: 1; cursor: pointer; margin: 0;">
+                        <strong>כרטיס ${cardNum}</strong> - ${card.name || 'ללא שם'} 
+                        ${card.gadudName ? `(${card.gadudName})` : ''}
+                        ${remaining === 0 ? '- כמות שנותרה: 0 ליטר ✓' : ''}
+                        ${card.gadudCreditDate ? `- זיכוי גדודי: ${card.gadudCreditDate}` : ''}
+                    </label>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+        cardsList.innerHTML = html;
+        executeBtn.style.display = 'none';
+    }
+
+    // עדכון נראות כפתור ביצוע החזרה
+    updateBatchReturnButton() {
+        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]:checked');
+        const executeBtn = document.getElementById('executeBatchReturnBtn');
+        
+        if (checkboxes.length > 0) {
+            executeBtn.style.display = 'block';
+            executeBtn.textContent = `החזר ${checkboxes.length} כרטיסים נבחרים`;
+        } else {
+            executeBtn.style.display = 'none';
+        }
+    }
+
+    // בחירת כל הכרטיסים להחזרה
+    selectAllBatchReturn() {
+        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+        });
+        this.updateBatchReturnButton();
+    }
+
+    // ביטול בחירת כל הכרטיסים להחזרה
+    deselectAllBatchReturn() {
+        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        this.updateBatchReturnButton();
+    }
+
+    // ביצוע החזרה על כל הכרטיסים שנבחרו
+    async executeBatchReturn() {
+        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]:checked');
+        
+        if (checkboxes.length === 0) {
+            this.showStatus('לא נבחרו כרטיסים להחזרה', 'error');
+            return;
+        }
+
+        // הצגת חלונית אישור
+        const cardNumbers = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+        const confirmMessage = `האם אתה בטוח שברצונך להחזיר ${cardNumbers.length} כרטיסים?\n\nכרטיסים: ${cardNumbers.join(', ')}`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // ביצוע החזרה על כל הכרטיסים
+        this.showStatus(`מבצע החזרה על ${cardNumbers.length} כרטיסים...`, 'processing');
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        for (const cardNum of cardNumbers) {
+            try {
+                // מצא את הכרטיס
+                const cardIndex = this.fuelCards.findIndex(card => {
+                    const cardCardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
+                    return cardCardNum === cardNum;
+                });
+
+                if (cardIndex === -1) {
+                    errors.push(`כרטיס ${cardNum} לא נמצא`);
+                    errorCount++;
+                    continue;
+                }
+
+                const card = this.fuelCards[cardIndex];
+                
+                // בדיקה שהכרטיס לא הוחזר לגמרי
+                if (card.status === 'returned' || card.status === 'final_return') {
+                    errors.push(`כרטיס ${cardNum} כבר הוחזר לגמרי`);
+                    errorCount++;
+                    continue;
+                }
+
+                // בדיקה שיש זיכוי גדודי
+                if (!card.gadudCreditDate) {
+                    errors.push(`כרטיס ${cardNum} - לא ניתן להחזיר לפני ביצוע זיכוי גדודי`);
+                    errorCount++;
+                    continue;
+                }
+
+                // בדיקה שכמות שנותרה היא 0
+                const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
+                    ? Number(card.remainingFuel) 
+                    : null;
+                if (remaining !== null && remaining !== 0) {
+                    errors.push(`כרטיס ${cardNum} - לא ניתן להחזיר לפני זיכוי גדודי מלא (כמות שנותרה חייבת להיות 0)`);
+                    errorCount++;
+                    continue;
+                }
+
+                // עדכון הכרטיס - החזרה (זיכוי סופי)
+                card.status = 'returned';
+                card.date = this.formatDateTime();
+                const creditDate = this.formatDateTime();
+                card.creditDate = creditDate;
+                
+                // הוסף לשרשרת העברת כרטיס
+                if (!card.cardChain) {
+                    card.cardChain = [];
+                }
+                card.cardChain.push({
+                    action: 'החזרת כרטיס (החזרה רצף)',
+                    amount: card.amount,
+                    date: this.formatDateTime(),
+                    status: 'returned'
+                });
+                
+                // שמירה ב-Firebase
+                await this.updateCardInFirebase(card);
+                successCount++;
+            } catch (error) {
+                console.error(`שגיאה בהחזרת כרטיס ${cardNum}:`, error);
+                errors.push(`כרטיס ${cardNum}: ${error.message}`);
+                errorCount++;
+            }
+        }
+
+        // עדכון הטבלה
+        this.renderTable();
+
+        // סגירת ה-modal
+        this.closeBatchReturnModal();
+
+        // הצגת תוצאות
+        if (errorCount === 0) {
+            this.showStatus(`החזרה הושלמה בהצלחה! ${successCount} כרטיסים הוחזרו.`, 'success');
+        } else {
+            const errorMsg = `החזרה הושלמה חלקית: ${successCount} כרטיסים הוחזרו, ${errorCount} שגיאות.\n${errors.join('\n')}`;
             this.showStatus(errorMsg, 'error');
         }
     }
