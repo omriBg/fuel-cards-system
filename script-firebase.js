@@ -35,6 +35,9 @@ class FuelCardManager {
         }, 1000);
         console.log('המערכת מוכנה לשימוש!');
         
+        // הגדרת event listeners לכפתורי סגירת modal שגיאות
+        this.setupStatusModalListeners();
+        
         // Fallback: סגור את ה-splash screen אחרי 3 שניות אם הוא עדיין מוצג
         setTimeout(() => {
             const splashScreen = document.getElementById('splashScreen');
@@ -45,6 +48,53 @@ class FuelCardManager {
                 }, 600);
             }
         }, 3000);
+    }
+
+    // הגדרת event listeners לכפתורי סגירת modal
+    setupStatusModalListeners() {
+        // המתן עד שה-DOM נטען
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.attachModalListeners());
+        } else {
+            this.attachModalListeners();
+        }
+    }
+
+    attachModalListeners() {
+        const modal = document.getElementById('statusModal');
+        if (!modal) return;
+
+        // סגירה בלחיצה על הרקע
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeStatusModal();
+            }
+        });
+
+        // סגירה בלחיצה על כפתור X
+        const closeBtn = modal.querySelector('.status-modal__close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeStatusModal();
+            });
+        }
+
+        // סגירה בלחיצה על כפתור "הבנתי"
+        const actionBtn = modal.querySelector('.status-modal__action');
+        if (actionBtn) {
+            actionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeStatusModal();
+            });
+        }
+
+        // סגירה בלחיצה על Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('status-modal--visible')) {
+                this.closeStatusModal();
+            }
+        });
     }
 
     formatDateTime(value) {
@@ -1143,19 +1193,24 @@ class FuelCardManager {
             this.statusModalTimeout = null;
         }
 
-        // הסתר את ה-modal
+        // הסתר את ה-modal - מספר דרכים כדי לוודא שזה עובד
         modal.classList.remove('status-modal--visible');
         modal.classList.add('status-modal--hidden');
         modal.setAttribute('aria-hidden', 'true');
         
-        // גם דרך style.display למקרה שה-CSS לא עובד.
-        // מאפס ל-empty כדי שהפתיחה הבאה תחזיר את display המקורי (flex מה-CSS).
-        modal.style.display = '';
+        // גם דרך style.display למקרה שה-CSS לא עובד - השתמש ב-none במקום empty
+        modal.style.display = 'none';
         
         // נקה את התוכן
         const messageEl = document.getElementById('statusModalMessage');
         if (messageEl) {
             messageEl.textContent = '';
+        }
+        
+        // הסתר גם את הרקע אם קיים
+        const backdrop = modal.querySelector('div[style*="position: fixed"]');
+        if (backdrop) {
+            backdrop.style.display = 'none';
         }
     }
 
@@ -1478,7 +1533,12 @@ class FuelCardManager {
             return;
         }
 
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
+        // המרת מספר כרטיס למספר כדי להבטיח השוואה נכונה (טיפול בבעיית טיפוסים)
+        const cardNum = typeof cardNumber === 'string' ? parseInt(cardNumber, 10) : cardNumber;
+        const cardIndex = this.fuelCards.findIndex(card => {
+            const cardCardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
+            return cardCardNum === cardNum;
+        });
         
         if (cardIndex === -1) {
             this.showStatus('כרטיס לא נמצא במערכת', 'error');
@@ -2614,6 +2674,8 @@ class FuelCardManager {
 // אתחול המערכת
 console.log('מתחיל לטעון את המערכת...');
 const fuelCardManager = new FuelCardManager();
+// הגדר גם ב-window כדי שה-onclick handlers יעבדו
+window.fuelCardManager = fuelCardManager;
 
 // פונקציות גלובליות
 function startRecording(action) {
