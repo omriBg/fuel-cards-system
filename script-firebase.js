@@ -1925,6 +1925,12 @@ class FuelCardManager {
             'button[onclick*="showTypingForm(\'gadud_return\')"]'
         ];
 
+        // כפתור זיכוי רצף - רק למנהל
+        const batchCreditBtn = document.getElementById('batchCreditBtn');
+        if (batchCreditBtn) {
+            batchCreditBtn.style.display = user.isAdmin ? 'block' : 'none';
+        }
+
         // מצא את כל ה-control-card divs של ניפוק/עדכון/החזרת כרטיס
         const controlCards = document.querySelectorAll('.control-card');
         const adminControlCards = [];
@@ -2165,6 +2171,215 @@ class FuelCardManager {
         const adminPanel = document.getElementById('adminPanel');
         if (adminPanel) {
             adminPanel.remove();
+        }
+    }
+
+    // זיכוי רצף - פתיחת modal
+    showBatchCreditModal() {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            this.showStatus('אין לך הרשאה לבצע זיכוי רצף. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('batchCreditModal');
+        if (modal) {
+            modal.style.display = 'block';
+            // נקה את הבחירה הקודמת
+            document.getElementById('batchCreditGadud').value = '';
+            document.getElementById('batchCreditCardsList').innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
+            document.getElementById('executeBatchCreditBtn').style.display = 'none';
+        }
+    }
+
+    // זיכוי רצף - סגירת modal
+    closeBatchCreditModal() {
+        const modal = document.getElementById('batchCreditModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // זיכוי רצף - טעינת כרטיסים לפי גדוד
+    loadCardsForBatchCredit() {
+        const gadud = document.getElementById('batchCreditGadud').value;
+        const cardsList = document.getElementById('batchCreditCardsList');
+        const executeBtn = document.getElementById('executeBatchCreditBtn');
+
+        if (!gadud) {
+            cardsList.innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
+            executeBtn.style.display = 'none';
+            return;
+        }
+
+        // סנן כרטיסים: שייכים לגדוד, יש להם gadudCreditDate (זוכו גדודית), אבל לא הוחזרו לגמרי
+        const eligibleCards = this.fuelCards.filter(card => {
+            return card.gadudNumber === gadud && 
+                   card.gadudCreditDate && 
+                   card.status !== 'returned' && 
+                   card.status !== 'final_return';
+        });
+
+        if (eligibleCards.length === 0) {
+            cardsList.innerHTML = '<p style="text-align: center; color: #666;">לא נמצאו כרטיסים לזיכוי בגדוד זה</p>';
+            executeBtn.style.display = 'none';
+            return;
+        }
+
+        // צור רשימה עם checkboxes
+        let html = '<div style="direction: rtl;">';
+        html += `<h4 style="margin-bottom: 15px; color: #2c3e50;">נמצאו ${eligibleCards.length} כרטיסים לזיכוי:</h4>`;
+        html += '<div style="max-height: 350px; overflow-y: auto;">';
+        
+        eligibleCards.forEach((card, index) => {
+            const cardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
+            html += `
+                <div style="
+                    padding: 12px;
+                    margin-bottom: 8px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    background: #f9f9f9;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                ">
+                    <input 
+                        type="checkbox" 
+                        id="batchCreditCard_${cardNum}" 
+                        value="${cardNum}"
+                        style="width: 20px; height: 20px; cursor: pointer;"
+                        onchange="fuelCardManager.updateBatchCreditButton()"
+                    >
+                    <label for="batchCreditCard_${cardNum}" style="flex: 1; cursor: pointer; margin: 0;">
+                        <strong>כרטיס ${cardNum}</strong> - ${card.name || 'ללא שם'} 
+                        ${card.gadudName ? `(${card.gadudName})` : ''}
+                        ${card.remainingFuel !== undefined ? `- נשאר: ${card.remainingFuel} ליטר` : ''}
+                    </label>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+        cardsList.innerHTML = html;
+        executeBtn.style.display = 'none';
+    }
+
+    // עדכון נראות כפתור ביצוע זיכוי
+    updateBatchCreditButton() {
+        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]:checked');
+        const executeBtn = document.getElementById('executeBatchCreditBtn');
+        
+        if (checkboxes.length > 0) {
+            executeBtn.style.display = 'block';
+            executeBtn.textContent = `זכה ${checkboxes.length} כרטיסים נבחרים`;
+        } else {
+            executeBtn.style.display = 'none';
+        }
+    }
+
+    // בחירת כל הכרטיסים
+    selectAllBatchCredit() {
+        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+        });
+        this.updateBatchCreditButton();
+    }
+
+    // ביטול בחירת כל הכרטיסים
+    deselectAllBatchCredit() {
+        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        this.updateBatchCreditButton();
+    }
+
+    // ביצוע זיכוי על כל הכרטיסים שנבחרו
+    async executeBatchCredit() {
+        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]:checked');
+        
+        if (checkboxes.length === 0) {
+            this.showStatus('לא נבחרו כרטיסים לזיכוי', 'error');
+            return;
+        }
+
+        // הצגת חלונית אישור
+        const cardNumbers = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+        const confirmMessage = `האם אתה בטוח שברצונך לזכות ${cardNumbers.length} כרטיסים?\n\nכרטיסים: ${cardNumbers.join(', ')}`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // ביצוע זיכוי על כל הכרטיסים
+        this.showStatus(`מבצע זיכוי על ${cardNumbers.length} כרטיסים...`, 'processing');
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        for (const cardNum of cardNumbers) {
+            try {
+                // מצא את הכרטיס
+                const cardIndex = this.fuelCards.findIndex(card => {
+                    const cardCardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
+                    return cardCardNum === cardNum;
+                });
+
+                if (cardIndex === -1) {
+                    errors.push(`כרטיס ${cardNum} לא נמצא`);
+                    errorCount++;
+                    continue;
+                }
+
+                const card = this.fuelCards[cardIndex];
+                
+                // בדיקה שהכרטיס לא הוחזר לגמרי
+                if (card.status === 'returned' || card.status === 'final_return') {
+                    errors.push(`כרטיס ${cardNum} כבר הוחזר לגמרי`);
+                    errorCount++;
+                    continue;
+                }
+
+                // עדכון הכרטיס - החזרה (זיכוי סופי)
+                card.status = 'returned';
+                card.date = this.formatDateTime();
+                card.creditDate = this.formatDateTime();
+                
+                // הוסף לשרשרת העברת כרטיס
+                if (!card.cardChain) {
+                    card.cardChain = [];
+                }
+                card.cardChain.push({
+                    action: 'החזרת כרטיס (זיכוי רצף)',
+                    amount: card.amount,
+                    date: this.formatDateTime(),
+                    status: 'returned'
+                });
+                
+                // שמירה ב-Firebase
+                await this.updateCardInFirebase(card);
+                successCount++;
+            } catch (error) {
+                console.error(`שגיאה בזיכוי כרטיס ${cardNum}:`, error);
+                errors.push(`כרטיס ${cardNum}: ${error.message}`);
+                errorCount++;
+            }
+        }
+
+        // עדכון הטבלה
+        this.renderTable();
+
+        // סגירת ה-modal
+        this.closeBatchCreditModal();
+
+        // הצגת תוצאות
+        if (errorCount === 0) {
+            this.showStatus(`זיכוי הושלם בהצלחה! ${successCount} כרטיסים זוכו.`, 'success');
+        } else {
+            const errorMsg = `זיכוי הושלם חלקית: ${successCount} כרטיסים זוכו, ${errorCount} שגיאות.\n${errors.join('\n')}`;
+            this.showStatus(errorMsg, 'error');
         }
     }
 
