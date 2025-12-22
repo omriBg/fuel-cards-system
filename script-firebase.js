@@ -762,6 +762,12 @@ class FuelCardManager {
                 return this.getStatusText(card.status);
             case 'issueDate':
                 return card.issueDate || card.date || '';
+            case 'creditDate':
+                return card.creditDate || '';
+            case 'gadudIssueDate':
+                return card.gadudIssueDate || '';
+            case 'gadudCreditDate':
+                return card.gadudCreditDate || '';
             case 'currentHolder':
                 return card.currentHolderName || 'לא זמין';
             case 'cardChain':
@@ -1373,65 +1379,32 @@ class FuelCardManager {
         // יצירת מערך של נתונים ל-Excel
         const excelData = [];
         
-        // הוספת כותרות
-        excelData.push([
-            'מספר כרטיס',
-            'שם',
-            'טלפון',
-            'כמות (ליטר)',
-            'סוג דלק',
-            'מספר גדוד',
-            'סטטוס',
-            'תאריך ניפוק',
-            'משתמש',
-            'שם (ניפוק גדודי)',
-            'מספר אישי (ניפוק גדודי)',
-            'כמות דלק שנשאר (ניפוק גדודי)'
-        ]);
+        // קבלת העמודות הנראות (כמו בטבלה)
+        const visibleColumns = this.tableColumns.filter(column => this.canViewColumn(column));
         
-        // הוספת הנתונים
+        // הוספת כותרות - לפי העמודות הנראות בטבלה
+        const headers = visibleColumns.map(column => column.name);
+        excelData.push(headers);
+        
+        // הוספת הנתונים - לפי העמודות הנראות בטבלה
         filteredCards.forEach(card => {
-            const userInfo = this.getUserInfo(card).replace(/<br>/g, ' | ');
-            const gadudNumber = card.gadudNumber || '';
-            const gadudName = card.gadudName || '';
-            const gadudId = card.gadudId || '';
-            const remainingFuel = card.remainingFuel || card.amount || '';
-            
-            excelData.push([
-                card.cardNumber,
-                card.name,
-                card.phone,
-                card.amount,
-                card.fuelType,
-                gadudNumber,
-                this.getStatusText(card.status),
-                card.issueDate || card.date || '',
-                userInfo,
-                gadudName,
-                gadudId,
-                remainingFuel
-            ]);
+            const row = visibleColumns.map(column => {
+                // עבור עמודת משתמש, נשתמש בפונקציה מיוחדת
+                if (column.id === 'user') {
+                    return this.getUserInfo(card).replace(/<br>/g, ' | ');
+                }
+                // עבור כל שאר העמודות, נשתמש ב-getCellValue
+                return this.getCellValue(card, column);
+            });
+            excelData.push(row);
         });
         
         // יצירת workbook
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(excelData);
         
-        // הגדרת רוחב עמודות
-        const colWidths = [
-            { wch: 12 },  // מספר כרטיס
-            { wch: 20 },  // שם
-            { wch: 15 },  // טלפון
-            { wch: 12 },  // כמות
-            { wch: 12 },  // סוג דלק
-            { wch: 12 },  // מספר גדוד
-            { wch: 12 },  // סטטוס
-            { wch: 18 },  // תאריך ניפוק
-            { wch: 20 },  // משתמש
-            { wch: 20 },  // שם גדודי
-            { wch: 20 },  // מספר אישי גדודי
-            { wch: 25 }   // כמות דלק שנשאר
-        ];
+        // הגדרת רוחב עמודות - לפי מספר העמודות
+        const colWidths = visibleColumns.map(() => ({ wch: 18 }));
         ws['!cols'] = colWidths;
         
         // הוספת גיליון ל-workbook
