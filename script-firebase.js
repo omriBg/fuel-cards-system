@@ -2843,6 +2843,28 @@ class FuelCardManager {
                         </div>
                         
                         <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">שם מלא:</label>
+                            <input type="text" id="editName" placeholder="הכנס שם מלא" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #ddd;
+                                border-radius: 8px;
+                                font-size: 16px;
+                            ">
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר טלפון:</label>
+                            <input type="tel" id="editPhone" placeholder="הכנס מספר טלפון" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #ddd;
+                                border-radius: 8px;
+                                font-size: 16px;
+                            ">
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
                             <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">סוג דלק:</label>
                             <div class="fuel-type-selector" data-fuel-selector="editFuelType">
                                 <div class="fuel-type-buttons">
@@ -2944,10 +2966,14 @@ class FuelCardManager {
         
         // מצא את הכרטיס - מלא את הטופס
         const cardNumberInput = document.getElementById('editCardNumber');
+        const nameInput = document.getElementById('editName');
+        const phoneInput = document.getElementById('editPhone');
         const fuelTypeInput = document.getElementById('editFuelType');
         const gadudSelect = document.getElementById('editGadudNumber');
         
         if (cardNumberInput) cardNumberInput.value = card.cardNumber || '';
+        if (nameInput) nameInput.value = card.name || '';
+        if (phoneInput) phoneInput.value = card.phone || '';
         if (fuelTypeInput) {
             fuelTypeInput.value = card.fuelType || '';
             // עדכן את בורר סוג הדלק
@@ -2993,6 +3019,8 @@ class FuelCardManager {
         
         const originalCardNumber = parseInt(formFields.getAttribute('data-original-card-number'));
         const newCardNumber = parseInt(document.getElementById('editCardNumber').value);
+        const name = document.getElementById('editName').value.trim();
+        const phone = document.getElementById('editPhone').value.trim();
         const fuelType = document.getElementById('editFuelType').value.trim();
         const gadudNumber = document.getElementById('editGadudNumber').value;
         
@@ -3035,6 +3063,8 @@ class FuelCardManager {
         
         // עדכן את הכרטיס
         this.fuelCards[cardIndex].cardNumber = newCardNumber;
+        this.fuelCards[cardIndex].name = name || this.fuelCards[cardIndex].name || '';
+        this.fuelCards[cardIndex].phone = phone || this.fuelCards[cardIndex].phone || '';
         this.fuelCards[cardIndex].fuelType = fuelType;
         this.fuelCards[cardIndex].gadudNumber = gadudNumber || '';
         this.fuelCards[cardIndex].date = this.formatDateTime();
@@ -3069,6 +3099,8 @@ class FuelCardManager {
     clearEditCardForm() {
         const searchInput = document.getElementById('editCardSearchNumber');
         const cardNumberInput = document.getElementById('editCardNumber');
+        const nameInput = document.getElementById('editName');
+        const phoneInput = document.getElementById('editPhone');
         const fuelTypeInput = document.getElementById('editFuelType');
         const gadudSelect = document.getElementById('editGadudNumber');
         const formFields = document.getElementById('editCardFormFields');
@@ -3076,6 +3108,8 @@ class FuelCardManager {
         
         if (searchInput) searchInput.value = '';
         if (cardNumberInput) cardNumberInput.value = '';
+        if (nameInput) nameInput.value = '';
+        if (phoneInput) phoneInput.value = '';
         if (fuelTypeInput) {
             fuelTypeInput.value = '';
             resetFuelTypeSelector('editFuelType');
