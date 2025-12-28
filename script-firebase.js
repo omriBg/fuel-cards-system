@@ -27,6 +27,7 @@ class FuelCardManager {
         console.log('עמודות טבלה:', this.tableColumns);
         console.log('משתמש נוכחי:', this.currentUser);
         this.initSpeechRecognition();
+        this.initFirebaseAuth(); // התחברות אוטומטית ל-Firebase Authentication
         this.checkLogin();
         this.loadDataFromFirebase();
         // עדכן את פקדי המיון והסינון אחרי טעינת הדף
@@ -148,6 +149,34 @@ class FuelCardManager {
     // הסתרת loading state
     hideLoadingState() {
         // renderTable ידאג לניקוי
+    }
+
+    // ============================================
+    // Firebase Authentication
+    // ============================================
+    // התחברות אוטומטית ל-Firebase Anonymous Authentication
+    // זה מאפשר גישה מאובטחת למסד הנתונים
+    async initFirebaseAuth() {
+        try {
+            if (!window.auth || !window.signInAnonymously) {
+                console.warn('Firebase Authentication לא זמין');
+                return;
+            }
+            
+            // בדוק אם כבר יש משתמש מחובר
+            if (window.auth.currentUser) {
+                console.log('✅ משתמש כבר מחובר ל-Firebase Authentication');
+                return;
+            }
+            
+            // התחברות אוטומטית עם Anonymous Authentication
+            const userCredential = await window.signInAnonymously(window.auth);
+            console.log('✅ התחברות ל-Firebase Authentication הצליחה:', userCredential.user.uid);
+        } catch (error) {
+            console.error('❌ שגיאה בהתחברות ל-Firebase Authentication:', error);
+            // לא נעצור את הטעינה אם Authentication נכשל
+            // אבל זה אומר שהגישה למסד הנתונים לא תעבוד
+        }
     }
 
     // ============================================
@@ -1688,7 +1717,17 @@ class FuelCardManager {
         this.currentUser = user;
     }
 
-    logout() {
+    async logout() {
+        // התנתקות מ-Firebase Authentication
+        try {
+            if (window.auth && window.auth.currentUser && window.signOut) {
+                await window.signOut(window.auth);
+                console.log('✅ התנתקות מ-Firebase Authentication הצליחה');
+            }
+        } catch (error) {
+            console.error('❌ שגיאה בהתנתקות מ-Firebase Authentication:', error);
+        }
+        
         localStorage.removeItem('currentUser');
         this.currentUser = null;
         this.clearBulkIssueState();
@@ -1744,7 +1783,7 @@ class FuelCardManager {
         this.updateInterfaceByPermissions();
     }
 
-    login() {
+    async login() {
         const name = document.getElementById('loginName').value.trim();
         const gadud = document.getElementById('loginGadud').value;
         
@@ -1785,6 +1824,23 @@ class FuelCardManager {
         if (!isAuthorized) {
             this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
             return;
+        }
+        
+        // 🔒 התחברות ל-Firebase Authentication (רק אחרי שהסיסמה נכונה!)
+        try {
+            if (!window.auth || !window.signInAnonymously) {
+                console.warn('Firebase Authentication לא זמין - המשך ללא Authentication');
+            } else if (!window.auth.currentUser) {
+                // התחברות ל-Firebase Anonymous Authentication
+                await window.signInAnonymously(window.auth);
+                console.log('✅ התחברות ל-Firebase Authentication הצליחה');
+            } else {
+                console.log('✅ משתמש כבר מחובר ל-Firebase Authentication');
+            }
+        } catch (error) {
+            console.error('❌ שגיאה בהתחברות ל-Firebase Authentication:', error);
+            // נמשיך גם אם Authentication נכשל, אבל נזהיר
+            this.showStatus('אזהרה: בעיה בהתחברות לאבטחה. חלק מהפונקציות עלולות לא לעבוד.', 'warning');
         }
         
         const user = {

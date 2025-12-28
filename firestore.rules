@@ -3,12 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Collection: fuelCards
     match /fuelCards/{cardId} {
-      // קריאה - מאפשר גם ללא authentication (זמני)
-      // ⚠️ בעתיד: לשנות ל-request.auth != null
-      allow read: if true;
+      // קריאה - רק משתמשים מחוברים (Firebase Authentication)
+      allow read: if request.auth != null;
       
-      // כתיבה - ולידציה מחמירה של הנתונים
+      // כתיבה - רק משתמשים מחוברים + ולידציה מחמירה של הנתונים
       allow create: if 
+        // חובה: משתמש מחובר
+        request.auth != null &&
         // בדיקה שיש את כל השדות החובה
         request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
         // בדיקה שסוגי הנתונים נכונים
@@ -29,8 +30,10 @@ service cloud.firestore {
         request.resource.data.cardNumber > 0 &&
         request.resource.data.cardNumber <= 999999999999; // תקרת מספר כרטיס גבוהה למניעת חסימה
       
-      // עדכון - ולידציה מחמירה
+      // עדכון - רק משתמשים מחוברים + ולידציה מחמירה
       allow update: if 
+        // חובה: משתמש מחובר
+        request.auth != null &&
         // בדיקה שהשדות החובה קיימים
         request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
         // בדיקה שסוגי הנתונים נכונים
@@ -53,9 +56,8 @@ service cloud.firestore {
         // בדיקה שמספר הכרטיס לא משתנה (אבטחה)
         request.resource.data.cardNumber == resource.data.cardNumber;
       
-      // מחיקה - מאפשר (זמני)
-      // ⚠️ בעתיד: לשנות ל-request.auth != null && isAdmin
-      allow delete: if true;
+      // מחיקה - רק משתמשים מחוברים
+      allow delete: if request.auth != null;
     }
     
     // Collection אחרות - חסום לחלוטין
