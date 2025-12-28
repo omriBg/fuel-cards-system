@@ -796,6 +796,7 @@ class FuelCardManager {
                 { id: 'status', name: 'סטטוס', type: 'text', editable: false, department: 'all' },
                 { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
                 { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
+                { id: 'gadudVehicleNumber', name: 'מספר רכב (זיכוי גדודי)', type: 'text', editable: false, department: 'all' },
                 { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
                 { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
             ];
@@ -811,6 +812,7 @@ class FuelCardManager {
             { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
             { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
             { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
+            { id: 'gadudVehicleNumber', name: 'מספר רכב (זיכוי גדודי)', type: 'text', editable: false, department: 'all' },
             { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
             { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
         ];
@@ -871,6 +873,8 @@ class FuelCardManager {
                 return this.getCardChainText(card.cardChain);
             case 'gadudName':
                 return card.gadudName || '';
+            case 'gadudVehicleNumber':
+                return card.gadudVehicleNumber || '';
             case 'remainingFuel':
                 return (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (card.amount || '');
             default:
@@ -1592,7 +1596,7 @@ class FuelCardManager {
     }
 
     // מחיקת נתונים גדודיים מכרטיס (זיכוי גדודי)
-    async clearGadudData(cardNumber, gadudCreditDate) {
+    async clearGadudData(cardNumber, vehicleNumber, gadudCreditDate) {
         // בדיקת הרשאות - צריך משתמש מחובר
         if (!this.currentUser) {
             this.showStatus('נדרשת התחברות', 'error');
@@ -1626,6 +1630,7 @@ class FuelCardManager {
         
         this.fuelCards[cardIndex].gadudName = '';
         this.fuelCards[cardIndex].remainingFuel = 0;
+        this.fuelCards[cardIndex].gadudVehicleNumber = vehicleNumber; // שמירת מספר רכב
         this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
@@ -1636,7 +1641,7 @@ class FuelCardManager {
     }
 
     // הצגת חלונית אישור לזיכוי גדודי
-    showGadudCreditConfirmation(cardNumber, gadudCreditDate) {
+    showGadudCreditConfirmation(cardNumber, vehicleNumber, gadudCreditDate) {
         // הסתר את הממשק הראשי
         const container = document.querySelector('.container') || document.getElementById('mainContainer');
         if (container) container.style.display = 'none';
@@ -1650,6 +1655,7 @@ class FuelCardManager {
         
         // שמור את הפרטים לחלונית
         confirmationDialog.setAttribute('data-card-number', cardNumber);
+        confirmationDialog.setAttribute('data-vehicle-number', vehicleNumber);
         confirmationDialog.setAttribute('data-credit-date', gadudCreditDate);
         confirmationDialog.style.display = 'block';
     }
@@ -1734,6 +1740,7 @@ class FuelCardManager {
         if (!dialog) return;
         
         const cardNumber = dialog.getAttribute('data-card-number');
+        const vehicleNumber = dialog.getAttribute('data-vehicle-number');
         const gadudCreditDate = dialog.getAttribute('data-credit-date');
         
         // סגור את החלונית
@@ -1747,7 +1754,7 @@ class FuelCardManager {
         if (container) container.style.display = 'block';
         
         // ביצוע הזיכוי
-        this.clearGadudData(cardNumber, gadudCreditDate);
+        this.clearGadudData(cardNumber, vehicleNumber, gadudCreditDate);
         hideTypingForm();
         clearGadudReturnForm();
     }
@@ -3729,10 +3736,11 @@ function submitGadudReturn() {
     console.log('שולח טופס זיכוי גדודי');
     
     const cardNumber = document.getElementById('gadudReturnCardNumber').value;
+    const vehicleNumber = document.getElementById('gadudVehicleNumber').value.trim();
     const gadudCreditDateInput = document.getElementById('gadudCreditDate').value;
     const gadudCreditDate = fuelCardManager.formatDateTime(gadudCreditDateInput);
     
-    // בדיקת שדה חובה
+    // בדיקת שדה חובה - מספר כרטיס
     if (!cardNumber) {
         fuelCardManager.showStatus('יש למלא מספר כרטיס', 'error');
         return;
@@ -3750,8 +3758,20 @@ function submitGadudReturn() {
         return;
     }
     
-    // הצגת חלונית אישור לפני ביצוע הזיכוי
-    fuelCardManager.showGadudCreditConfirmation(cardNum, gadudCreditDate);
+    // בדיקת שדה חובה - מספר רכב
+    if (!vehicleNumber) {
+        fuelCardManager.showStatus('יש למלא מספר רכב שנוצל הכרטיס עבורו', 'error');
+        return;
+    }
+    
+    // בדיקת ולידציה של מספר רכב (4 עד 9 ספרות)
+    if (!/^\d{4,9}$/.test(vehicleNumber)) {
+        fuelCardManager.showStatus('מספר רכב חייב להכיל בין 4 ל-9 ספרות בלבד', 'error');
+        return;
+    }
+    
+    // הצגת חלונית אישור לפני ביצוע הזיכוי (רק אחרי שכל השדות מולאו)
+    fuelCardManager.showGadudCreditConfirmation(cardNum, vehicleNumber, gadudCreditDate);
 }
 
 // ניקוי טופס ניפוק גדודי
@@ -3775,6 +3795,10 @@ function clearGadudUpdateForm() {
 // ניקוי טופס זיכוי גדודי
 function clearGadudReturnForm() {
     document.getElementById('gadudReturnCardNumber').value = '';
+    const vehicleNumberField = document.getElementById('gadudVehicleNumber');
+    if (vehicleNumberField) {
+        vehicleNumberField.value = '';
+    }
     const creditDateField = document.getElementById('gadudCreditDate');
     if (creditDateField) {
         creditDateField.value = '';
