@@ -28,14 +28,8 @@ class FuelCardManager {
         console.log('משתמש נוכחי:', this.currentUser);
         this.initSpeechRecognition();
         this.checkLogin();
-        // התחברות ל-Firebase Authentication - מחכה קצת כדי לוודא ש-Firebase נטען
-        setTimeout(() => {
-            this.initFirebaseAuth();
-        }, 500);
-        // טעינת נתונים - מחכה ש-Authentication יתחבר
-        setTimeout(() => {
-            this.loadDataFromFirebase();
-        }, 1500);
+        // המתן ש-Firebase יהיה מוכן לפני התחברות
+        this.waitForFirebaseAndInit();
         // עדכן את פקדי המיון והסינון אחרי טעינת הדף
         setTimeout(() => {
             this.updateAdminSortingControls();
@@ -184,6 +178,34 @@ class FuelCardManager {
     // ============================================
     // Firebase Authentication
     // ============================================
+    // המתן ש-Firebase יהיה מוכן ואז התחל את התהליך
+    async waitForFirebaseAndInit() {
+        // המתן ש-Firebase יהיה מוכן
+        let attempts = 0;
+        const maxAttempts = 20; // מקסימום 10 שניות
+        
+        while (attempts < maxAttempts) {
+            if (window.firebaseReady && window.auth && window.signInAnonymously) {
+                console.log('✅ Firebase מוכן, מתחיל תהליך Authentication...');
+                await this.initFirebaseAuth();
+                // המתן ש-Authentication יתחבר ואז טען נתונים
+                setTimeout(() => {
+                    this.loadDataFromFirebase();
+                }, 1000);
+                return;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        console.error('❌ Firebase לא נטען אחרי 10 שניות - מנסה בכל זאת...');
+        // נסה בכל זאת
+        await this.initFirebaseAuth();
+        setTimeout(() => {
+            this.loadDataFromFirebase();
+        }, 1000);
+    }
+    
     // התחברות אוטומטית ל-Firebase Anonymous Authentication
     // זה מאפשר גישה מאובטחת למסד הנתונים
     async initFirebaseAuth() {
