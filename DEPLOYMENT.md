@@ -198,3 +198,15 @@ firebase login --reauth
 3. ודא שאתה מחובר: `firebase login`
 
 
+
+
+
+
+
+
+
+
+
+
+
+

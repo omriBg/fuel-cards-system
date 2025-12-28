@@ -213,3 +213,15 @@ const transaction = db.runTransaction(async (transaction) => {
 
 **הערה:** המערכת מוכנה לשימוש יומיומי **אחרי פריסת Security Rules**. בלי זה, המסד נתונים פתוח לכל העולם!
 
+
+
+
+
+
+
+
+
+
+
+
+

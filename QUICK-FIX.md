@@ -67,3 +67,15 @@ firebase deploy --only firestore:rules
 
 **הערה:** כל הפרטים המלאים נמצאים ב-`SECURITY-AUDIT.md`
 
+
+
+
+
+
+
+
+
+
+
+
+
