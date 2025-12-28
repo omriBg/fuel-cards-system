@@ -737,10 +737,10 @@ class FuelCardManager {
         const card = this.fuelCards[cardIndex];
 
         // דרישה: ניתן להחזיר רק אחרי זיכוי גדודי מלא → remainingFuel חייב להיות 0
-        // אם יש נתונים גדודיים (gadudName, gadudId, או gadudNumber), חייבים לוודא:
+        // אם יש נתונים גדודיים (gadudName או gadudNumber), חייבים לוודא:
         // 1. שזיכוי גדודי בוצע (gadudCreditDate קיים)
         // 2. שהכמות שנותרה היא בדיוק 0
-        if (card.gadudName || card.gadudId || card.gadudNumber) {
+        if (card.gadudName || card.gadudNumber) {
             // בדיקה אם יש כמות שנותרה שלא 0
             const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
                 ? Number(card.remainingFuel) 
@@ -795,7 +795,6 @@ class FuelCardManager {
                 { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
                 { id: 'status', name: 'סטטוס', type: 'text', editable: false, department: 'all' },
                 { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
-                { id: 'gadudId', name: 'מספר אישי (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
                 { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
                 { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
                 { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
@@ -811,7 +810,6 @@ class FuelCardManager {
             { id: 'issueDate', name: 'תאריך ניפוק', type: 'date', editable: true, department: 'all' },
             { id: 'creditDate', name: 'תאריך זיכוי', type: 'date', editable: true, department: 'all' },
             { id: 'gadudName', name: 'שם (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
-            { id: 'gadudId', name: 'מספר אישי (ניפוק גדודי)', type: 'text', editable: true, department: 'all' },
             { id: 'remainingFuel', name: 'כמות דלק שנשאר (ניפוק גדודי)', type: 'number', editable: true, department: 'all' },
             { id: 'gadudIssueDate', name: 'תאריך ניפוק גדודי', type: 'date', editable: true, department: 'all' },
             { id: 'gadudCreditDate', name: 'תאריך זיכוי גדודי', type: 'date', editable: true, department: 'all' }
@@ -873,8 +871,6 @@ class FuelCardManager {
                 return this.getCardChainText(card.cardChain);
             case 'gadudName':
                 return card.gadudName || '';
-            case 'gadudId':
-                return card.gadudId || '';
             case 'remainingFuel':
                 return (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (card.amount || '');
             default:
@@ -935,7 +931,7 @@ class FuelCardManager {
             
             // הוספת מחלקת צבע לפי סטטוס
             // ניפוק/עדכון גדודי - צהוב (אם יש נתונים גדודיים)
-            if (card.gadudName || card.gadudId) {
+            if (card.gadudName) {
                 row.classList.add('row-gadud');
             }
             // ניפוק רגיל - אדום
@@ -955,7 +951,7 @@ class FuelCardManager {
                     let cellValue = this.getCellValue(card, column);
                     // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
                     if (column.id === 'remainingFuel') {
-                        const isClickable = card.gadudName || card.gadudId; // רק אם יש נתונים גדודיים
+                        const isClickable = card.gadudName; // רק אם יש נתונים גדודיים
                         const clickableClass = isClickable ? 'clickable-remaining-fuel' : '';
                         const cursorStyle = isClickable ? 'cursor: pointer;' : '';
                         const title = isClickable ? 'לחץ לזיכוי גדודי (איפוס ל-0)' : '';
@@ -1517,7 +1513,7 @@ class FuelCardManager {
     }
 
     // הוספת נתונים גדודיים לכרטיס
-    async addGadudData(cardNumber, gadudName, gadudId, remainingFuel, gadudIssueDate) {
+    async addGadudData(cardNumber, gadudName, remainingFuel, gadudIssueDate) {
         // בדיקת הרשאות - צריך משתמש מחובר
         if (!this.currentUser) {
             this.showStatus('נדרשת התחברות', 'error');
@@ -1545,7 +1541,6 @@ class FuelCardManager {
         }
 
         this.fuelCards[cardIndex].gadudName = gadudName;
-        this.fuelCards[cardIndex].gadudId = gadudId;
         if (typeof remainingFuel !== 'undefined') {
             this.fuelCards[cardIndex].remainingFuel = remainingFuel;
         }
@@ -1559,7 +1554,7 @@ class FuelCardManager {
     }
 
     // עדכון נתונים גדודיים לכרטיס
-    async updateGadudData(cardNumber, gadudName, gadudId, remainingFuel) {
+    async updateGadudData(cardNumber, gadudName, remainingFuel) {
         // בדיקת הרשאות - צריך משתמש מחובר
         if (!this.currentUser) {
             this.showStatus('נדרשת התחברות', 'error');
@@ -1587,7 +1582,6 @@ class FuelCardManager {
         }
 
         this.fuelCards[cardIndex].gadudName = gadudName;
-        this.fuelCards[cardIndex].gadudId = gadudId;
         this.fuelCards[cardIndex].remainingFuel = remainingFuel;
         this.fuelCards[cardIndex].date = this.formatDateTime();
 
@@ -1631,7 +1625,6 @@ class FuelCardManager {
         }
         
         this.fuelCards[cardIndex].gadudName = '';
-        this.fuelCards[cardIndex].gadudId = '';
         this.fuelCards[cardIndex].remainingFuel = 0;
         this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
         this.fuelCards[cardIndex].date = this.formatDateTime();
@@ -3685,7 +3678,7 @@ function submitGadudNew() {
     
     // ביצוע הפעולה
     try {
-        fuelCardManager.addGadudData(cardNum, gadudName, '', undefined, gadudIssueDate);
+        fuelCardManager.addGadudData(cardNum, gadudName, undefined, gadudIssueDate);
         hideTypingForm();
         clearGadudNewForm();
     } catch (error) {
@@ -3700,11 +3693,10 @@ function submitGadudUpdate() {
     
     const cardNumber = document.getElementById('gadudUpdateCardNumber').value;
     const gadudName = document.getElementById('gadudUpdateName').value;
-    const gadudId = document.getElementById('gadudUpdateId').value;
     const remainingFuel = document.getElementById('gadudUpdateRemainingFuel').value;
     
     // בדיקת שדות חובה
-    if (!cardNumber || !gadudName || !gadudId || !remainingFuel) {
+    if (!cardNumber || !gadudName || !remainingFuel) {
         fuelCardManager.showStatus('יש למלא את כל השדות', 'error');
         return;
     }
@@ -3723,7 +3715,7 @@ function submitGadudUpdate() {
     
     // ביצוע הפעולה
     try {
-        fuelCardManager.updateGadudData(cardNum, gadudName, gadudId, parseInt(remainingFuel));
+        fuelCardManager.updateGadudData(cardNum, gadudName, parseInt(remainingFuel));
         hideTypingForm();
         clearGadudUpdateForm();
     } catch (error) {
@@ -3863,7 +3855,7 @@ function showVoiceInstructions(action) {
                 אמור את הפרטים הבאים:
             </div>
             <div class="example">
-                "עדכון גדודי כרטיס [מספר] [שם] [מספר אישי] [כמות דלק שנשאר]"
+                "עדכון גדודי כרטיס [מספר] [שם] [כמות דלק שנשאר]"
             </div>
             <div class="instruction-content">
                 <strong>דוגמה:</strong><br>
