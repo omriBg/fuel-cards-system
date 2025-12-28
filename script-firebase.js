@@ -27,9 +27,15 @@ class FuelCardManager {
         console.log('עמודות טבלה:', this.tableColumns);
         console.log('משתמש נוכחי:', this.currentUser);
         this.initSpeechRecognition();
-        this.initFirebaseAuth(); // התחברות אוטומטית ל-Firebase Authentication
         this.checkLogin();
-        this.loadDataFromFirebase();
+        // התחברות ל-Firebase Authentication - מחכה קצת כדי לוודא ש-Firebase נטען
+        setTimeout(() => {
+            this.initFirebaseAuth();
+        }, 500);
+        // טעינת נתונים - מחכה ש-Authentication יתחבר
+        setTimeout(() => {
+            this.loadDataFromFirebase();
+        }, 1500);
         // עדכן את פקדי המיון והסינון אחרי טעינת הדף
         setTimeout(() => {
             this.updateAdminSortingControls();
@@ -112,6 +118,21 @@ class FuelCardManager {
     // טעינת נתונים מ-Firebase
     async loadDataFromFirebase() {
         try {
+            // בדוק אם Firebase זמין
+            if (!window.db || !window.firebaseGetDocs) {
+                console.warn('Firebase לא זמין - ממתין...');
+                setTimeout(() => this.loadDataFromFirebase(), 1000);
+                return;
+            }
+            
+            // בדוק אם יש Authentication (אם נדרש)
+            if (window.auth && !window.auth.currentUser) {
+                console.warn('⚠️ ממתין להתחברות ל-Firebase Authentication...');
+                // נסה שוב אחרי שנייה
+                setTimeout(() => this.loadDataFromFirebase(), 1000);
+                return;
+            }
+            
             console.log('טוען נתונים מ-Firebase...');
             
             // הצג loading state
@@ -134,7 +155,16 @@ class FuelCardManager {
         } catch (error) {
             console.error('שגיאה בטעינת נתונים מ-Firebase:', error);
             this.hideLoadingState();
-            this.showStatus('שגיאה בטעינת נתונים', 'error');
+            
+            // אם זו שגיאת permission, זה אומר ש-Authentication לא מופעל
+            if (error.code === 'permission-denied') {
+                console.error('⚠️ שגיאת הרשאות - ודא ש-Anonymous Authentication מופעל ב-Firebase Console');
+                this.showStatus('שגיאה: אין הרשאות לגשת לנתונים. אנא ודא ש-Anonymous Authentication מופעל ב-Firebase Console.', 'error');
+                // נסה שוב אחרי 2 שניות
+                setTimeout(() => this.loadDataFromFirebase(), 2000);
+            } else {
+                this.showStatus('שגיאה בטעינת נתונים', 'error');
+            }
         }
     }
     
@@ -158,24 +188,42 @@ class FuelCardManager {
     // זה מאפשר גישה מאובטחת למסד הנתונים
     async initFirebaseAuth() {
         try {
-            if (!window.auth || !window.signInAnonymously) {
-                console.warn('Firebase Authentication לא זמין');
+            // המתן קצת כדי לוודא ש-Firebase נטען
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // בדוק אם Firebase Authentication זמין
+            if (!window.auth) {
+                console.warn('⚠️ Firebase Auth לא זמין - ממתין...');
+                // נסה שוב אחרי שנייה
+                setTimeout(() => this.initFirebaseAuth(), 1000);
+                return;
+            }
+            
+            if (!window.signInAnonymously) {
+                console.warn('⚠️ signInAnonymously לא זמין - ממתין...');
+                setTimeout(() => this.initFirebaseAuth(), 1000);
                 return;
             }
             
             // בדוק אם כבר יש משתמש מחובר
             if (window.auth.currentUser) {
-                console.log('✅ משתמש כבר מחובר ל-Firebase Authentication');
+                console.log('✅ משתמש כבר מחובר ל-Firebase Authentication:', window.auth.currentUser.uid);
                 return;
             }
             
             // התחברות אוטומטית עם Anonymous Authentication
+            console.log('🔄 מנסה להתחבר ל-Firebase Authentication...');
             const userCredential = await window.signInAnonymously(window.auth);
             console.log('✅ התחברות ל-Firebase Authentication הצליחה:', userCredential.user.uid);
         } catch (error) {
             console.error('❌ שגיאה בהתחברות ל-Firebase Authentication:', error);
-            // לא נעצור את הטעינה אם Authentication נכשל
-            // אבל זה אומר שהגישה למסד הנתונים לא תעבוד
+            // אם זו שגיאת permission, זה אומר ש-Anonymous Authentication לא מופעל
+            if (error.code === 'auth/operation-not-allowed') {
+                console.error('⚠️ Anonymous Authentication לא מופעל ב-Firebase Console!');
+                console.error('⚠️ אנא הפעל Anonymous Authentication ב-Firebase Console → Authentication → Sign-in method');
+            }
+            // נסה שוב אחרי 2 שניות
+            setTimeout(() => this.initFirebaseAuth(), 2000);
         }
     }
 
@@ -1829,9 +1877,12 @@ class FuelCardManager {
         // 🔒 התחברות ל-Firebase Authentication (רק אחרי שהסיסמה נכונה!)
         try {
             if (!window.auth || !window.signInAnonymously) {
-                console.warn('Firebase Authentication לא זמין - המשך ללא Authentication');
+                console.warn('⚠️ Firebase Authentication לא זמין - המשך ללא Authentication');
+                // נסה שוב אחרי שנייה
+                setTimeout(() => this.initFirebaseAuth(), 1000);
             } else if (!window.auth.currentUser) {
                 // התחברות ל-Firebase Anonymous Authentication
+                console.log('🔄 מנסה להתחבר ל-Firebase Authentication...');
                 await window.signInAnonymously(window.auth);
                 console.log('✅ התחברות ל-Firebase Authentication הצליחה');
             } else {
@@ -1839,8 +1890,14 @@ class FuelCardManager {
             }
         } catch (error) {
             console.error('❌ שגיאה בהתחברות ל-Firebase Authentication:', error);
-            // נמשיך גם אם Authentication נכשל, אבל נזהיר
-            this.showStatus('אזהרה: בעיה בהתחברות לאבטחה. חלק מהפונקציות עלולות לא לעבוד.', 'warning');
+            // אם זו שגיאת permission, זה אומר ש-Anonymous Authentication לא מופעל
+            if (error.code === 'auth/operation-not-allowed') {
+                console.error('⚠️ Anonymous Authentication לא מופעל ב-Firebase Console!');
+                this.showStatus('שגיאה: Anonymous Authentication לא מופעל. אנא הפעל אותו ב-Firebase Console → Authentication → Sign-in method', 'error');
+            } else {
+                // נמשיך גם אם Authentication נכשל, אבל נזהיר
+                this.showStatus('אזהרה: בעיה בהתחברות לאבטחה. חלק מהפונקציות עלולות לא לעבוד.', 'warning');
+            }
         }
         
         const user = {
