@@ -1395,7 +1395,6 @@
 
         <div class="data-table">
             <h3 style="text-align: center; margin-bottom: 20px; color: #2c3e50;">טבלת כרטיסי דלק</h3>
-            <button class="download-btn" onclick="downloadExcel()">הורד Excel</button>
             
             <!-- פקדי מיון וסינון למנהל מערכת -->
             <div id="adminSortingControls" style="display: block; background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; direction: rtl;">
@@ -1405,10 +1404,10 @@
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">מיון לפי:</label>
                         <select id="sortBy" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
                             <option value="none">ללא מיון</option>
-                            <option value="date_asc">תאריך ניפוק - מהעתיק לחדש</option>
-                            <option value="date_desc">תאריך ניפוק - מהחדש לעתיק</option>
-                            <option value="credit_date_asc">תאריך זיכוי - מהעתיק לחדש</option>
-                            <option value="credit_date_desc">תאריך זיכוי - מהחדש לעתיק</option>
+                            <option value="date_asc">תאריך ניפוק - מהישן לחדש</option>
+                            <option value="date_desc">תאריך ניפוק - מהחדש לישן</option>
+                            <option value="credit_date_asc">תאריך זיכוי - מהישן לחדש</option>
+                            <option value="credit_date_desc">תאריך זיכוי - מהחדש לישן</option>
                             <option value="card_number_asc">מספר כרטיס - עולה</option>
                             <option value="card_number_desc">מספר כרטיס - יורד</option>
                         </select>
