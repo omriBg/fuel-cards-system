@@ -986,6 +986,8 @@ class FuelCardManager {
             
             // יצירת תוכן השורה לפי העמודות
             let rowContent = '';
+            let hasAnyContent = false; // בדיקה אם יש תוכן כלשהו בשורה
+            
             this.tableColumns.forEach(column => {
                 // בדוק אם המשתמש יכול לראות את העמודה
                 if (this.canViewColumn(column)) {
@@ -996,6 +998,10 @@ class FuelCardManager {
                     }
                     // המר למחרוזת כדי למנוע בעיות
                     cellValue = String(cellValue);
+                    // בדוק אם יש תוכן בתא
+                    if (cellValue.trim() !== '') {
+                        hasAnyContent = true;
+                    }
                     // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
                     if (column.id === 'remainingFuel') {
                         const isClickable = card.gadudName; // רק אם יש נתונים גדודיים
@@ -1010,8 +1016,11 @@ class FuelCardManager {
                 }
             });
             
-            row.innerHTML = rowContent;
-            tbody.appendChild(row);
+            // הצג את השורה רק אם יש תוכן כלשהו
+            if (hasAnyContent) {
+                row.innerHTML = rowContent;
+                tbody.appendChild(row);
+            }
         });
         
         // עדכן את פקדי המיון והסינון אחרי רינדור הטבלה
@@ -1020,9 +1029,22 @@ class FuelCardManager {
         }
     }
     
+    // בדיקה אם כרטיס תקין (לא ריק)
+    isValidCard(card) {
+        if (!card) return false;
+        // כרטיס נחשב תקין אם יש לו לפחות מספר כרטיס או שם
+        const hasCardNumber = card.cardNumber !== undefined && card.cardNumber !== null && card.cardNumber !== '';
+        const hasName = card.name !== undefined && card.name !== null && card.name !== '';
+        // אם אין גם מספר כרטיס וגם שם, הכרטיס ריק
+        return hasCardNumber || hasName;
+    }
+    
     // סינון וחיפוש כרטיסים
     getFilteredAndSearchedCards() {
         let cards = this.getFilteredCards();
+        
+        // סינון כרטיסים ריקים - הסר כרטיסים ללא נתונים בסיסיים
+        cards = cards.filter(card => this.isValidCard(card));
         
         // סינון לפי סטטוס (עדכון לתמיכה בכל האפשרויות)
         const statusFilter = document.getElementById('statusFilter');
