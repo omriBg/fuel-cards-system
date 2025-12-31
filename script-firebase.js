@@ -137,7 +137,9 @@ class FuelCardManager {
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
                 data.id = doc.id; // הוסף את ה-ID של המסמך
-                this.fuelCards.push(data);
+                // נקה undefined values
+                const cleanedData = this.cleanUndefinedValues(data);
+                this.fuelCards.push(cleanedData);
             });
             console.log('כרטיסים נטענו מ-Firebase:', this.fuelCards.length);
             this.hideLoadingState();
@@ -160,6 +162,30 @@ class FuelCardManager {
                 this.showStatus('שגיאה בטעינת נתונים', 'error');
             }
         }
+    }
+    
+    // ניקוי ערכי undefined מהאובייקט
+    cleanUndefinedValues(obj) {
+        if (obj === null || obj === undefined) {
+            return {};
+        }
+        
+        const cleaned = {};
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                const value = obj[key];
+                // אם הערך הוא undefined, החלף אותו במחרוזת ריקה או null
+                if (value === undefined) {
+                    cleaned[key] = '';
+                } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                    // אם זה אובייקט, נקה אותו רקורסיבית
+                    cleaned[key] = this.cleanUndefinedValues(value);
+                } else {
+                    cleaned[key] = value;
+                }
+            }
+        }
+        return cleaned;
     }
     
     // הצגת loading state
@@ -844,42 +870,50 @@ class FuelCardManager {
 
     // קבלת ערך תא
     getCellValue(card, column) {
+        if (!card || !column) return '';
+        
+        // פונקציה עזר לניקוי ערך
+        const cleanValue = (value) => {
+            if (value === undefined || value === null) return '';
+            return value;
+        };
+        
         switch(column.id) {
             case 'cardNumber':
-                return card.cardNumber || '';
+                return cleanValue(card.cardNumber);
             case 'name':
-                return card.name || '';
+                return cleanValue(card.name);
             case 'phone':
-                return card.phone || '';
+                return cleanValue(card.phone);
             case 'amount':
-                return card.amount || '';
+                return cleanValue(card.amount);
             case 'fuelType':
-                return card.fuelType || '';
+                return cleanValue(card.fuelType);
             case 'gadudNumber':
-                return card.gadudNumber || '';
+                return cleanValue(card.gadudNumber);
             case 'status':
-                return this.getStatusText(card.status);
+                return this.getStatusText(card.status || '');
             case 'issueDate':
-                return card.issueDate || card.date || '';
+                return cleanValue(card.issueDate || card.date);
             case 'creditDate':
-                return card.creditDate || '';
+                return cleanValue(card.creditDate);
             case 'gadudIssueDate':
-                return card.gadudIssueDate || '';
+                return cleanValue(card.gadudIssueDate);
             case 'gadudCreditDate':
-                return card.gadudCreditDate || '';
+                return cleanValue(card.gadudCreditDate);
             case 'currentHolder':
-                return card.currentHolderName || 'לא זמין';
+                return cleanValue(card.currentHolderName) || 'לא זמין';
             case 'cardChain':
                 return this.getCardChainText(card.cardChain);
             case 'gadudName':
-                return card.gadudName || '';
+                return cleanValue(card.gadudName);
             case 'gadudVehicleNumber':
-                return card.gadudVehicleNumber || '';
+                return cleanValue(card.gadudVehicleNumber);
             case 'remainingFuel':
-                return (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (card.amount || '');
+                return (card.remainingFuel !== undefined && card.remainingFuel !== null) ? card.remainingFuel : (cleanValue(card.amount));
             default:
                 // עמודות מותאמות אישית
-                return card[column.id] || '';
+                return cleanValue(card[column.id]);
         }
     }
 
@@ -894,11 +928,14 @@ class FuelCardManager {
 
     // קבלת טקסט סטטוס
     getStatusText(status) {
+        if (status === undefined || status === null) {
+            return '';
+        }
         switch(status) {
             case 'new': return 'חדש';
             case 'updated': return 'עודכן';
             case 'returned': return 'הוחזר';
-            default: return status;
+            default: return status || '';
         }
     }
 
@@ -953,13 +990,20 @@ class FuelCardManager {
                 // בדוק אם המשתמש יכול לראות את העמודה
                 if (this.canViewColumn(column)) {
                     let cellValue = this.getCellValue(card, column);
+                    // ודא ש-cellValue לא undefined או null
+                    if (cellValue === undefined || cellValue === null) {
+                        cellValue = '';
+                    }
+                    // המר למחרוזת כדי למנוע בעיות
+                    cellValue = String(cellValue);
                     // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
                     if (column.id === 'remainingFuel') {
                         const isClickable = card.gadudName; // רק אם יש נתונים גדודיים
                         const clickableClass = isClickable ? 'clickable-remaining-fuel' : '';
                         const cursorStyle = isClickable ? 'cursor: pointer;' : '';
                         const title = isClickable ? 'לחץ לזיכוי גדודי (איפוס ל-0)' : '';
-                        rowContent += `<td class="${clickableClass}" style="${cursorStyle}" title="${title}" ${isClickable ? `onclick="fuelCardManager.showGadudCreditConfirmation('${card.cardNumber}', '')"` : ''}>${cellValue}</td>`;
+                        const cardNumber = (card.cardNumber !== undefined && card.cardNumber !== null) ? String(card.cardNumber) : '';
+                        rowContent += `<td class="${clickableClass}" style="${cursorStyle}" title="${title}" ${isClickable ? `onclick="fuelCardManager.showGadudCreditConfirmation('${cardNumber}', '')"` : ''}>${cellValue}</td>`;
                     } else {
                         rowContent += `<td>${cellValue}</td>`;
                     }
