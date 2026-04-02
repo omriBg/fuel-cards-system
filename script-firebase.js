@@ -3515,6 +3515,108 @@ function downloadExcel() {
     fuelCardManager.downloadExcel();
 }
 
+function initDomEventBindings() {
+    if (document.body && document.body.dataset && document.body.dataset.actionsBound === 'true') {
+        return;
+    }
+
+    document.addEventListener('click', (event) => {
+        const actionElement = event.target.closest('[data-action]');
+        if (!actionElement) return;
+
+        const action = actionElement.getAttribute('data-action');
+        if (!action) return;
+
+        switch (action) {
+            case 'login':
+                if (fuelCardManager && typeof fuelCardManager.login === 'function') {
+                    fuelCardManager.login();
+                }
+                break;
+            case 'logout':
+                if (fuelCardManager && typeof fuelCardManager.logout === 'function') {
+                    fuelCardManager.logout();
+                }
+                break;
+            case 'showEditCardForm':
+                if (fuelCardManager && typeof fuelCardManager.showEditCardForm === 'function') {
+                    fuelCardManager.showEditCardForm();
+                }
+                break;
+            case 'showTypingForm':
+                showTypingForm(actionElement.getAttribute('data-form-action'));
+                break;
+            case 'hideTypingForm':
+                hideTypingForm();
+                break;
+            case 'submitNewCard':
+                submitNewCard();
+                break;
+            case 'submitUpdateCard':
+                submitUpdateCard();
+                break;
+            case 'submitReturnCard':
+                submitReturnCard();
+                break;
+            case 'submitGadudNew':
+                submitGadudNew();
+                break;
+            case 'submitGadudUpdate':
+                submitGadudUpdate();
+                break;
+            case 'submitGadudReturn':
+                submitGadudReturn();
+                break;
+            case 'downloadExcel':
+                downloadExcel();
+                break;
+            case 'filterTable':
+                if (fuelCardManager && typeof fuelCardManager.filterTable === 'function') {
+                    fuelCardManager.filterTable();
+                }
+                break;
+            case 'clearSearch': {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.value = '';
+                if (fuelCardManager && typeof fuelCardManager.filterTable === 'function') {
+                    fuelCardManager.filterTable();
+                }
+                break;
+            }
+            case 'resetSortingAndFiltering':
+                if (fuelCardManager && typeof fuelCardManager.resetSortingAndFiltering === 'function') {
+                    fuelCardManager.resetSortingAndFiltering();
+                }
+                break;
+            default:
+                break;
+        }
+    });
+
+    document.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!target || !target.id) return;
+        const filterIds = ['sortBy', 'statusFilter', 'gadudFilter', 'fuelTypeFilter', 'yearFilter', 'monthFilter'];
+        if (filterIds.includes(target.id) && fuelCardManager && typeof fuelCardManager.applySortingAndFiltering === 'function') {
+            fuelCardManager.applySortingAndFiltering();
+        }
+    });
+
+    document.addEventListener('keyup', (event) => {
+        const target = event.target;
+        if (!target || target.id !== 'searchInput') return;
+        if (fuelCardManager && typeof fuelCardManager.filterTable === 'function') {
+            fuelCardManager.filterTable();
+        }
+    });
+
+    if (document.body && document.body.dataset) {
+        document.body.dataset.actionsBound = 'true';
+    }
+}
+
+initDomEventBindings();
+
 // וידוא שהפונקציות זמינות
 console.log('בודק זמינות פונקציות...');
 console.log('showTypingForm:', typeof showTypingForm);
