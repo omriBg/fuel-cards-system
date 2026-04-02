@@ -28,6 +28,24 @@
         return cards;
     };
 
+    window.FuelCardsService.getFuelCardsForUser = async function (user) {
+        assertFirebaseReady();
+        const isAdmin = !!(user && user.isAdmin);
+        const userGadud = user && user.gadud ? String(user.gadud) : '';
+        const collectionRef = getFuelCardsCollection();
+        const docsQuery = (!isAdmin && userGadud && window.firebaseQuery && window.firebaseWhere)
+            ? window.firebaseQuery(collectionRef, window.firebaseWhere('gadudNumber', '==', userGadud))
+            : collectionRef;
+        const querySnapshot = await window.firebaseGetDocs(docsQuery);
+        const cards = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data() || {};
+            data.id = doc.id;
+            cards.push(data);
+        });
+        return cards;
+    };
+
     // Adds a new card document and updates the passed object with `card.id`.
     window.FuelCardsService.addCard = async function (card) {
         assertFirebaseReady();

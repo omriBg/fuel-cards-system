@@ -1,15 +1,16 @@
-// מערכת ניהול כרטיסי דלק עם Firebase Firestore
 class FuelCardManager {
     constructor() {
         console.log('מתחיל את מערכת ניהול כרטיסי הדלק עם Firebase...');
         this.fuelCards = [];
         this.tableColumns = this.loadTableColumns();
-        this.currentUser = this.getCurrentUser();
-        this.statusModalTimeout = null;
+        this.authManager = new window.AuthManager(this);
+        this.uiManager = new window.FuelCardsUIManager(this);
+        this.domainService = new window.FuelCardsDomainService(this);
+        this.batchManager = new window.BatchOperationsManager(this);
+        this.currentUser = this.authManager.getCurrentUser();
         // דיבאונס כדי לא להריץ רינדור מלא בכל לחיצה/שינוי טקסט
         this._filterDebounceTimer = null;
         this.filterDebounceMs = 200;
-        this.handleStatusModalKeydown = this.handleStatusModalKeydown.bind(this);
         this.bulkIssue = {
             active: false,
             data: null
@@ -18,7 +19,7 @@ class FuelCardManager {
         this.adminGadudContacts = (window.APP_CONSTANTS && window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS)
             ? window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS
             : {};
-        document.addEventListener('keydown', this.handleStatusModalKeydown);
+        document.addEventListener('keydown', this.uiManager.handleStatusModalKeydown);
         this.setupGadudAutoFillHandler();
         console.log('עמודות טבלה:', this.tableColumns);
         console.log('משתמש נוכחי:', this.currentUser);
@@ -50,51 +51,12 @@ class FuelCardManager {
         this._remainingFuelClickBound = false;
     }
 
-    // הגדרת event listeners לכפתורי סגירת modal
     setupStatusModalListeners() {
-        // המתן עד שה-DOM נטען
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.attachModalListeners());
-        } else {
-            this.attachModalListeners();
-        }
+        this.uiManager.setupStatusModalListeners();
     }
 
     attachModalListeners() {
-        const modal = document.getElementById('statusModal');
-        if (!modal) return;
-
-        // סגירה בלחיצה על הרקע
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                this.closeStatusModal();
-            }
-        });
-
-        // סגירה בלחיצה על כפתור X
-        const closeBtn = modal.querySelector('.status-modal__close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.closeStatusModal();
-            });
-        }
-
-        // סגירה בלחיצה על כפתור "הבנתי"
-        const actionBtn = modal.querySelector('.status-modal__action');
-        if (actionBtn) {
-            actionBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.closeStatusModal();
-            });
-        }
-
-        // סגירה בלחיצה על Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('status-modal--visible')) {
-                this.closeStatusModal();
-            }
-        });
+        this.uiManager.attachModalListeners();
     }
 
     formatDateTime(value) {
@@ -130,25 +92,8 @@ class FuelCardManager {
             
             // הצג loading state
             this.showLoadingState();
-
-            const isAdmin = !!(this.currentUser && this.currentUser.isAdmin);
-            const userGadud = this.currentUser && this.currentUser.gadud ? String(this.currentUser.gadud) : '';
-
-            // חשוב: ב-Rules החדשים משתמש רגיל רשאי לקרוא רק את הגדוד שלו.
-            // לכן אסור לבצע get-all למשתמש רגיל, אחרת נקבל permission-denied.
-            const collectionRef = window.firebaseCollection(window.db, 'fuelCards');
-            const docsQuery = (!isAdmin && userGadud && window.firebaseQuery && window.firebaseWhere)
-                ? window.firebaseQuery(collectionRef, window.firebaseWhere('gadudNumber', '==', userGadud))
-                : collectionRef;
-
-            const querySnapshot = await window.firebaseGetDocs(docsQuery);
-            this.fuelCards = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                data.id = doc.id; // הוסף את ה-ID של המסמך
-                const cleanedData = this.cleanUndefinedValues(data);
-                this.fuelCards.push(cleanedData);
-            });
+            const cards = await window.FuelCardsService.getFuelCardsForUser(this.currentUser);
+            this.fuelCards = cards.map((card) => this.cleanUndefinedValues(card));
             console.log('כרטיסים נטענו מ-Firebase:', this.fuelCards.length);
             this.hideLoadingState();
             this.renderTable();
@@ -198,15 +143,12 @@ class FuelCardManager {
     
     // הצגת loading state
     showLoadingState() {
-        const tbody = document.getElementById('fuelCardsBody');
-        if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="100%" style="text-align: center; padding: 40px; color: #666;">טוען נתונים...</td></tr>';
-        }
+        this.uiManager.showLoadingState();
     }
     
     // הסתרת loading state
     hideLoadingState() {
-        // renderTable ידאג לניקוי
+        this.uiManager.hideLoadingState();
     }
 
     // ============================================
@@ -214,80 +156,11 @@ class FuelCardManager {
     // ============================================
     // המתן ש-Firebase יהיה מוכן ואז התחל את התהליך
     async waitForFirebaseAndInit() {
-        // המתן ש-Firebase יהיה מוכן
-        let attempts = 0;
-        const maxAttempts = 20; // מקסימום 10 שניות
-        
-        while (attempts < maxAttempts) {
-            if (window.firebaseReady && window.auth && window.onAuthStateChanged) {
-                console.log('✅ Firebase מוכן, מגדיר מאזין Authentication...');
-                this.setupAuthStateListener();
-                return;
-            }
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
-        }
-        
-        console.error('❌ Firebase לא נטען אחרי 10 שניות - מנסה בכל זאת...');
-        // נסה בכל זאת
-        this.setupAuthStateListener();
+        return this.authManager.waitForFirebaseAndInit();
     }
 
     setupAuthStateListener() {
-        // מונע רישום מאזין כפול (בטעינות/רענונים)
-        if (this._authStateListenerBound) return;
-        this._authStateListenerBound = true;
-
-        window.onAuthStateChanged(window.auth, async (user) => {
-            if (!user) {
-                // אין משתמש מחובר בפועל - נחזיר לטופס
-                localStorage.removeItem('currentUser');
-                this.currentUser = null;
-                this.showLoginForm();
-                return;
-            }
-
-            const email = user.email || '';
-            const adminEmail = 'admin@fuelcards-system.com';
-            const isAdmin = email === adminEmail;
-
-            const gadudFromEmail = (mail) => {
-                const map = {
-                    '650@fuelcards-system.com': '650',
-                    '703@fuelcards-system.com': '703',
-                    '651@fuelcards-system.com': '651',
-                    '791@fuelcards-system.com': '791',
-                    '652@fuelcards-system.com': '652',
-                    '638@fuelcards-system.com': '638',
-                    '653@fuelcards-system.com': '653',
-                    '674@fuelcards-system.com': '674'
-                };
-                return map[mail] || '';
-            };
-
-            const gadud = isAdmin ? 'admin' : gadudFromEmail(email);
-            if (!gadud) {
-                // משתמש לא מזוהה מול mapping מקומי (לא אמור לקרות אם הכל הוגדר נכון)
-                await window.signOut(window.auth);
-                localStorage.removeItem('currentUser');
-                this.currentUser = null;
-                this.showLoginForm();
-                return;
-            }
-
-            const userObj = {
-                name: email,
-                gadud,
-                isAdmin,
-                loginTime: new Date().toLocaleString('he-IL')
-            };
-
-            this.setCurrentUser(userObj);
-            this.showMainInterface();
-
-            // טעינת נתונים אחרי שיש auth בפועל + Rules allow
-            setTimeout(() => this.loadDataFromFirebase(), 100);
-        });
+        return this.authManager.setupAuthStateListener();
     }
     
     // התחברות אוטומטית ל-Firebase Anonymous Authentication
@@ -342,25 +215,9 @@ class FuelCardManager {
     // הוספת כרטיס חדש ל-Firebase (רק 1 write!)
     async addCardToFirebase(card) {
         try {
-            if (!window.db || !window.firebaseAddDoc) {
-                console.warn('Firebase לא זמין, מדלג על שמירה');
-                return;
-            }
-
-            if (window.FuelCardsService && window.FuelCardsService.addCard) {
-                const docId = await window.FuelCardsService.addCard(card);
-                console.log('כרטיס נוסף ל-Firebase:', docId);
-                return docId;
-            }
-
-            // Fallback (למקרה ש-service לא נטען)
-            const docRef = await window.firebaseAddDoc(
-                window.firebaseCollection(window.db, 'fuelCards'),
-                card
-            );
-            if (card) card.id = docRef.id;
-            console.log('כרטיס נוסף ל-Firebase:', docRef.id);
-            return docRef.id;
+            const docId = await window.FuelCardsService.addCard(card);
+            console.log('כרטיס נוסף ל-Firebase:', docId);
+            return docId;
         } catch (error) {
             console.error('שגיאה בהוספת כרטיס ל-Firebase:', error);
             this.showStatus('שגיאה בשמירת כרטיס', 'error');
@@ -371,40 +228,9 @@ class FuelCardManager {
     // עדכון כרטיס קיים ב-Firebase (רק 1 write!)
     async updateCardInFirebase(card) {
         try {
-            if (!window.db || !window.firebaseUpdateDoc) {
-                console.warn('Firebase לא זמין, מדלג על עדכון');
-                return;
-            }
-
-            if (window.FuelCardsService && window.FuelCardsService.updateCard) {
-                const updatedId = await window.FuelCardsService.updateCard(card);
-                console.log('כרטיס עודכן ב-Firebase:', updatedId);
-                return;
-            }
-
-            // Fallback (למקרה ש-service לא נטען)
-            if (!card.id) {
-                console.error('כרטיס ללא ID - לא ניתן לעדכן');
-                // נסה למצוא את ה-ID לפי cardNumber
-                const querySnapshot = await window.firebaseGetDocs(
-                    window.firebaseQuery(
-                        window.firebaseCollection(window.db, 'fuelCards'),
-                        window.firebaseWhere('cardNumber', '==', card.cardNumber)
-                    )
-                );
-
-                if (querySnapshot.empty) {
-                    throw new Error('כרטיס לא נמצא ב-Firebase');
-                }
-
-                card.id = querySnapshot.docs[0].id;
-            }
-
-            const cardRef = window.firebaseDoc(window.db, 'fuelCards', card.id);
-            // הסר את ה-id מהאובייקט לפני השמירה (Firestore לא צריך אותו)
-            const { id, ...cardData } = card;
-            await window.firebaseUpdateDoc(cardRef, cardData);
-            console.log('כרטיס עודכן ב-Firebase:', card.id);
+            const updatedId = await window.FuelCardsService.updateCard(card);
+            console.log('כרטיס עודכן ב-Firebase:', updatedId);
+            return updatedId;
         } catch (error) {
             console.error('שגיאה בעדכון כרטיס ב-Firebase:', error);
             this.showStatus('שגיאה בעדכון כרטיס', 'error');
@@ -415,21 +241,7 @@ class FuelCardManager {
     // מחיקת כרטיס מ-Firebase (רק 1 write!)
     async deleteCardFromFirebase(cardId) {
         try {
-            if (!window.db || !window.firebaseDeleteDoc) {
-                console.warn('Firebase לא זמין, מדלג על מחיקה');
-                return;
-            }
-
-            if (window.FuelCardsService && window.FuelCardsService.deleteCard) {
-                await window.FuelCardsService.deleteCard(cardId);
-                console.log('כרטיס נמחק מ-Firebase:', cardId);
-                return;
-            }
-
-            // Fallback (למקרה ש-service לא נטען)
-            if (!cardId) throw new Error('cardId חסר');
-            const cardRef = window.firebaseDoc(window.db, 'fuelCards', cardId);
-            await window.firebaseDeleteDoc(cardRef);
+            await window.FuelCardsService.deleteCard(cardId);
             console.log('כרטיס נמחק מ-Firebase:', cardId);
         } catch (error) {
             console.error('שגיאה במחיקת כרטיס מ-Firebase:', error);
@@ -441,25 +253,7 @@ class FuelCardManager {
     // מחיקת כל הכרטיסים (רק למקרים של clearAllData)
     async deleteAllCardsFromFirebase() {
         try {
-            if (!window.db || !window.firebaseGetDocs) {
-                console.warn('Firebase לא זמין, מדלג על מחיקה');
-                return;
-            }
-
-            if (window.FuelCardsService && window.FuelCardsService.deleteAllFuelCards) {
-                await window.FuelCardsService.deleteAllFuelCards();
-                console.log('כל הכרטיסים נמחקו מ-Firebase');
-                return;
-            }
-
-            // Fallback (למקרה ש-service לא נטען)
-            const querySnapshot = await window.firebaseGetDocs(
-                window.firebaseCollection(window.db, 'fuelCards')
-            );
-            const deletePromises = querySnapshot.docs.map(doc =>
-                window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
-            );
-            await Promise.all(deletePromises);
+            await window.FuelCardsService.deleteAllFuelCards();
             console.log('כל הכרטיסים נמחקו מ-Firebase');
         } catch (error) {
             console.error('שגיאה במחיקת כל הכרטיסים מ-Firebase:', error);
@@ -474,31 +268,7 @@ class FuelCardManager {
         console.warn('⚠️ שימוש ב-saveDataToFirebase() - לא יעיל! יש להשתמש בפונקציות הספציפיות');
         // שמירה רק למקרים מיוחדים - לא למחוק את הפונקציה לחלוטין
         try {
-            if (!window.db || !window.firebaseGetDocs) {
-                console.warn('Firebase לא זמין');
-                return;
-            }
-
-            if (window.FuelCardsService && window.FuelCardsService.saveDataToFirebase) {
-                await window.FuelCardsService.saveDataToFirebase(this.fuelCards);
-                console.log('נתונים נשמרו ל-Firebase בהצלחה (שיטה לא יעילה)');
-                return;
-            }
-
-            // Fallback (למקרה ש-service לא נטען)
-            // נמחק את כל המסמכים הקיימים
-            const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
-            const deletePromises = querySnapshot.docs.map(doc =>
-                window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
-            );
-            await Promise.all(deletePromises);
-
-            // נוסיף את כל הכרטיסים מחדש
-            const addPromises = this.fuelCards.map(card =>
-                window.firebaseAddDoc(window.firebaseCollection(window.db, 'fuelCards'), card)
-            );
-            await Promise.all(addPromises);
-
+            await window.FuelCardsService.saveDataToFirebase(this.fuelCards);
             console.log('נתונים נשמרו ל-Firebase בהצלחה (שיטה לא יעילה)');
         } catch (error) {
             console.error('שגיאה בשמירת נתונים ל-Firebase:', error);
@@ -508,152 +278,17 @@ class FuelCardManager {
 
     // הוספת כרטיס חדש
     async addNewCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול לנפק כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לנפק כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-
-        // בדיקת תקינות סוג דלק
-        if (command.fuelType) {
-            const allowedFuels = (window.APP_CONSTANTS && window.APP_CONSTANTS.ALLOWED_FUELS)
-                ? window.APP_CONSTANTS.ALLOWED_FUELS
-                : ['בנזין', 'סולר', 'דיזל', 'גז', 'חשמל', 'היברידי', 'אוריאה'];
-            const fuel = command.fuelType.toString().trim();
-            if (!allowedFuels.includes(fuel)) {
-                this.showStatus('סוג דלק לא תקין - בחר: בנזין, סולר, דיזל, גז, חשמל, היברידי, אוריאה', 'error');
-                return;
-            }
-        }
-
-        const existingIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
-        
-        if (existingIndex !== -1) {
-            this.showStatus('כרטיס כבר קיים במערכת', 'error');
-            return;
-        }
-        
-        const issueDate = command.issueDate || this.formatDateTime();
-
-        const newCard = {
-            cardNumber: command.cardNumber,
-            name: command.name,
-            phone: command.phone,
-            amount: command.amount,
-            fuelType: command.fuelType,
-            gadudNumber: command.gadudNumber || '',
-            issueDate: issueDate,
-            status: 'new',
-            date: issueDate,
-            // שרשרת העברת כרטיס
-            cardChain: [{
-                action: 'ניפוק ראשוני',
-                amount: command.amount,
-                date: issueDate,
-                status: 'active'
-            }],
-            currentHolder: 'system',
-            currentHolderName: 'מערכת'
-        };
-        
-        this.fuelCards.push(newCard);
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.addCardToFirebase(newCard);
-        this.renderTable();
-        this.showStatus('כרטיס חדש נוסף בהצלחה', 'success');
+        return this.domainService.addNewCard(command);
     }
 
     // עדכון כרטיס קיים
     async updateCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול לעדכן כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לעדכן כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-        
-        this.fuelCards[cardIndex].amount = command.amount;
-        this.fuelCards[cardIndex].status = 'updated';
-        this.fuelCards[cardIndex].date = this.formatDateTime();
-        
-        // הוסף לשרשרת העברת כרטיס
-        this.fuelCards[cardIndex].cardChain.push({
-            action: 'עדכון כמות',
-            amount: command.amount,
-            date: this.formatDateTime(),
-            status: 'active'
-        });
-        
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
-        this.renderTable();
-        this.showStatus('כרטיס עודכן בהצלחה', 'success');
+        return this.domainService.updateCard(command);
     }
 
     // החזרת כרטיס
     async returnCard(command) {
-        // בדיקת הרשאות - רק מנהל יכול להחזיר כרטיסים
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה להחזיר כרטיסים. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === command.cardNumber);
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-
-        const card = this.fuelCards[cardIndex];
-
-        // דרישה: ניתן להחזיר רק אחרי זיכוי גדודי מלא → remainingFuel חייב להיות 0
-        // אם יש נתונים גדודיים (gadudName או gadudNumber), חייבים לוודא:
-        // 1. שזיכוי גדודי בוצע (gadudCreditDate קיים)
-        // 2. שהכמות שנותרה היא בדיוק 0
-        if (card.gadudName || card.gadudNumber) {
-            // בדיקה אם יש כמות שנותרה שלא 0
-            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
-                ? Number(card.remainingFuel) 
-                : null;
-            
-            // אם יש כמות שנותרה והיא לא 0 - לא ניתן להחזיר
-            if (remaining !== null && (Number.isNaN(remaining) || remaining !== 0)) {
-                this.showStatus('לא ניתן להחזיר כרטיס לפני זיכוי גדודי מלא (כמות שנותרה חייבת להיות 0)', 'error');
-                return;
-            }
-            
-            // בדיקה אם זיכוי גדודי בוצע (gadudCreditDate קיים)
-            if (!card.gadudCreditDate) {
-                this.showStatus('לא ניתן להחזיר כרטיס לפני ביצוע זיכוי גדודי (חובה לתעד תאריך זיכוי גדודי)', 'error');
-                return;
-            }
-        }
-        
-        card.status = 'returned';
-        card.date = this.formatDateTime();
-        // שמירת תאריך זיכוי
-        const creditDate = command.creditDate || this.formatDateTime();
-        card.creditDate = creditDate;
-        
-        // הוסף לשרשרת העברת כרטיס
-        card.cardChain.push({
-            action: 'החזרת כרטיס',
-            amount: card.amount,
-            date: this.formatDateTime(),
-            status: 'returned'
-        });
-        
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(card);
-        this.renderTable();
-        this.showStatus('כרטיס הוחזר בהצלחה', 'success');
+        return this.domainService.returnCard(command);
     }
 
     // מערכת עמודות דינמיות
@@ -842,6 +477,10 @@ class FuelCardManager {
 
     // רינדור טבלה
     renderTable() {
+        this.uiManager.renderTable();
+    }
+
+    renderTableCore() {
         const tbody = document.getElementById('fuelCardsBody');
         tbody.innerHTML = '';
 
@@ -1305,6 +944,10 @@ class FuelCardManager {
 
     // עדכון כותרות הטבלה
     updateTableHeaders() {
+        this.uiManager.updateTableHeaders();
+    }
+
+    updateTableHeadersCore() {
         const fn = window.FuelCardsTableUI && window.FuelCardsTableUI.updateTableHeaders;
         if (typeof fn === 'function') {
             return fn({
@@ -1330,109 +973,19 @@ class FuelCardManager {
 
     // הצגת הודעות סטטוס
     showStatus(message, type) {
-        const statusDiv = document.getElementById('status');
-        if (statusDiv) {
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${type}`;
-            statusDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 3000);
-        }
-
-        this.openStatusModal(message, type);
+        this.uiManager.showStatus(message, type);
     }
 
     openStatusModal(message, type = 'info') {
-        const modal = document.getElementById('statusModal');
-        const messageEl = document.getElementById('statusModalMessage');
-        const titleEl = document.getElementById('statusModalTitle');
-        const iconEl = document.getElementById('statusModalIcon');
-
-        if (!modal || !messageEl) {
-            return;
-        }
-
-        const titles = {
-            success: 'הפעולה הצליחה',
-            error: 'פעולה נכשלה',
-            processing: 'מעבד בקשה',
-            info: 'עדכון מערכת'
-        };
-
-        const icons = {
-            success: '✓',
-            error: '!',
-            processing: '…',
-            info: 'ℹ'
-        };
-
-        const statusType = titles[type] ? type : 'info';
-        if (titleEl) {
-            titleEl.textContent = titles[statusType];
-        }
-        if (iconEl) {
-            iconEl.textContent = icons[statusType];
-        }
-        messageEl.textContent = message;
-
-        // ודא שהתיבה מוצגת לפני החלת מחלקות האנימציה
-        modal.style.display = 'flex';
-
-        modal.setAttribute('data-status-type', statusType);
-        modal.classList.remove('status-modal--hidden');
-        modal.classList.add('status-modal--visible');
-        modal.setAttribute('aria-hidden', 'false');
-
-        if (this.statusModalTimeout) {
-            clearTimeout(this.statusModalTimeout);
-        }
-
-        if (statusType !== 'error') {
-            this.statusModalTimeout = setTimeout(() => {
-                this.closeStatusModal();
-            }, 4500);
-        }
+        this.uiManager.openStatusModal(message, type);
     }
 
     closeStatusModal() {
-        const modal = document.getElementById('statusModal');
-        if (!modal) {
-            return;
-        }
-
-        // בטל כל timeout פעיל
-        if (this.statusModalTimeout) {
-            clearTimeout(this.statusModalTimeout);
-            this.statusModalTimeout = null;
-        }
-
-        // הסתר את ה-modal - מספר דרכים כדי לוודא שזה עובד
-        modal.classList.remove('status-modal--visible');
-        modal.classList.add('status-modal--hidden');
-        modal.setAttribute('aria-hidden', 'true');
-        
-        // גם דרך style.display למקרה שה-CSS לא עובד - השתמש ב-none במקום empty
-        modal.style.display = 'none';
-        
-        // נקה את התוכן
-        const messageEl = document.getElementById('statusModalMessage');
-        if (messageEl) {
-            messageEl.textContent = '';
-        }
-        
-        // הסתר גם את הרקע אם קיים
-        const backdrop = modal.querySelector('div[style*="position: fixed"]');
-        if (backdrop) {
-            backdrop.style.display = 'none';
-        }
+        this.uiManager.closeStatusModal();
     }
 
     handleStatusModalKeydown(event) {
-        if (event.key === 'Escape') {
-            this.closeStatusModal();
-        }
+        this.uiManager.handleStatusModalKeydown(event);
     }
 
     enableBulkIssue(data) {
@@ -1673,126 +1226,17 @@ class FuelCardManager {
 
     // הוספת נתונים גדודיים לכרטיס
     async addGadudData(cardNumber, gadudName, remainingFuel, gadudIssueDate) {
-        // בדיקת הרשאות - צריך משתמש מחובר
-        if (!this.currentUser) {
-            this.showStatus('נדרשת התחברות', 'error');
-            return;
-        }
-
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
-        const card = this.fuelCards[cardIndex];
-        if (card.status === 'returned' || card.status === 'final_return') {
-            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
-        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
-            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
-            return;
-        }
-
-        this.fuelCards[cardIndex].gadudName = gadudName;
-        if (typeof remainingFuel !== 'undefined') {
-            this.fuelCards[cardIndex].remainingFuel = remainingFuel;
-        }
-        this.fuelCards[cardIndex].gadudIssueDate = gadudIssueDate || this.formatDateTime();
-        this.fuelCards[cardIndex].date = this.formatDateTime();
-
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
-        this.renderTable();
-        this.showStatus('נתונים גדודיים נוספו בהצלחה', 'success');
+        return this.domainService.addGadudData(cardNumber, gadudName, remainingFuel, gadudIssueDate);
     }
 
     // עדכון נתונים גדודיים לכרטיס
     async updateGadudData(cardNumber, gadudName, remainingFuel) {
-        // בדיקת הרשאות - צריך משתמש מחובר
-        if (!this.currentUser) {
-            this.showStatus('נדרשת התחברות', 'error');
-            return;
-        }
-
-        const cardIndex = this.fuelCards.findIndex(card => card.cardNumber === cardNumber);
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
-        const card = this.fuelCards[cardIndex];
-        if (card.status === 'returned' || card.status === 'final_return') {
-            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
-        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
-            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
-            return;
-        }
-
-        this.fuelCards[cardIndex].gadudName = gadudName;
-        this.fuelCards[cardIndex].remainingFuel = remainingFuel;
-        this.fuelCards[cardIndex].date = this.formatDateTime();
-
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
-        this.renderTable();
-        this.showStatus('נתונים גדודיים עודכנו בהצלחה', 'success');
+        return this.domainService.updateGadudData(cardNumber, gadudName, remainingFuel);
     }
 
     // מחיקת נתונים גדודיים מכרטיס (זיכוי גדודי)
     async clearGadudData(cardNumber, vehicleNumber, gadudCreditDate) {
-        // בדיקת הרשאות - צריך משתמש מחובר
-        if (!this.currentUser) {
-            this.showStatus('נדרשת התחברות', 'error');
-            return;
-        }
-
-        // המרת מספר כרטיס למספר כדי להבטיח השוואה נכונה (טיפול בבעיית טיפוסים)
-        const cardNum = typeof cardNumber === 'string' ? parseInt(cardNumber, 10) : cardNumber;
-        const cardIndex = this.fuelCards.findIndex(card => {
-            const cardCardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
-            return cardCardNum === cardNum;
-        });
-        
-        if (cardIndex === -1) {
-            this.showStatus('כרטיס לא נמצא במערכת', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס לא הוחזר לגמרי (זיכוי סופי)
-        const card = this.fuelCards[cardIndex];
-        if (card.status === 'returned' || card.status === 'final_return') {
-            this.showStatus('לא ניתן לבצע פעולות גדודיות על כרטיס שהוחזר לגמרי (זיכוי סופי)', 'error');
-            return;
-        }
-
-        // בדיקה שהכרטיס שייך לגדוד של המשתמש (רק למשתמשים רגילים, מנהל יכול הכל)
-        if (!this.currentUser.isAdmin && card.gadudNumber !== this.currentUser.gadud) {
-            this.showStatus('אין לך הרשאה לערוך כרטיסים של גדודים אחרים', 'error');
-            return;
-        }
-        
-        this.fuelCards[cardIndex].gadudName = '';
-        this.fuelCards[cardIndex].remainingFuel = 0;
-        this.fuelCards[cardIndex].gadudVehicleNumber = vehicleNumber; // שמירת מספר רכב
-        this.fuelCards[cardIndex].gadudCreditDate = gadudCreditDate || this.formatDateTime();
-        this.fuelCards[cardIndex].date = this.formatDateTime();
-
-        // שמירה יעילה - רק 1 write במקום 2,000!
-        await this.updateCardInFirebase(this.fuelCards[cardIndex]);
-        this.renderTable();
-        this.showStatus('נתונים גדודיים נמחקו בהצלחה (זיכוי גדודי)', 'success');
+        return this.domainService.clearGadudData(cardNumber, vehicleNumber, gadudCreditDate);
     }
 
     // הצגת חלונית אישור לזיכוי גדודי
@@ -1898,261 +1342,49 @@ class FuelCardManager {
 
     // מערכת התחברות והרשאות
     getCurrentUser() {
-        return JSON.parse(localStorage.getItem('currentUser') || 'null');
+        return this.authManager.getCurrentUser();
     }
 
     setCurrentUser(user) {
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        this.currentUser = user;
+        this.authManager.setCurrentUser(user);
     }
 
     async logout() {
-        // התנתקות מ-Firebase Authentication
-        try {
-            if (window.auth && window.auth.currentUser && window.signOut) {
-                await window.signOut(window.auth);
-                console.log('✅ התנתקות מ-Firebase Authentication הצליחה');
-            }
-        } catch (error) {
-            console.error('❌ שגיאה בהתנתקות מ-Firebase Authentication:', error);
-        }
-        
-        localStorage.removeItem('currentUser');
-        this.currentUser = null;
-        this.clearBulkIssueState();
-        this.showLoginForm();
+        return this.authManager.logout();
     }
 
     checkLogin() {
-        // חייב להיות גם currentUser מקומי וגם משתמש מחובר בפועל
-        if (!this.currentUser || !window.auth || !window.auth.currentUser) {
-            this.showLoginForm();
-        } else {
-            this.showMainInterface();
-        }
+        this.authManager.checkLogin();
     }
 
     showLoginForm() {
-        // הסתר את ה-splash screen
-        const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) {
-            splashScreen.classList.add('fade-out');
-            setTimeout(() => {
-                splashScreen.style.display = 'none';
-            }, 600);
-        }
-        
-        // הסתר את הממשק הראשי
-        const container = document.querySelector('.container') || document.getElementById('mainContainer');
-        if (container) container.style.display = 'none';
-        
-        // הצג טופס התחברות
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) loginForm.style.display = 'block';
+        this.uiManager.showLoginForm();
     }
 
     showMainInterface() {
-        // הסתר את ה-splash screen
-        const splashScreen = document.getElementById('splashScreen');
-        if (splashScreen) {
-            splashScreen.classList.add('fade-out');
-            setTimeout(() => {
-                splashScreen.style.display = 'none';
-            }, 600);
-        }
-        
-        // הסתר טופס התחברות
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) loginForm.style.display = 'none';
-        
-        // הצג את הממשק הראשי
-        const container = document.querySelector('.container') || document.getElementById('mainContainer');
-        if (container) container.style.display = 'block';
-        
-        // עדכן את הממשק לפי הרשאות המשתמש
-        this.updateInterfaceByPermissions();
+        this.uiManager.showMainInterface();
     }
 
     async login() {
-        const name = document.getElementById('loginName').value.trim();
-        const gadud = document.getElementById('loginGadud').value;
-        
-        if (!name || !gadud) {
-            this.showLoginStatus('יש למלא את כל השדות', 'error');
-            return;
-        }
-
-        // אימות מאובטח באמצעות Firebase Auth Email/Password
-        // בטופס שלך: "loginName" משמש בפועל כסיסמה שהוזנה.
-        const password = name;
-        const adminEmail = 'admin@fuelcards-system.com';
-        const gadudEmails = {
-            '650': '650@fuelcards-system.com',
-            '703': '703@fuelcards-system.com',
-            '651': '651@fuelcards-system.com',
-            '791': '791@fuelcards-system.com',
-            '652': '652@fuelcards-system.com',
-            '638': '638@fuelcards-system.com',
-            '653': '653@fuelcards-system.com',
-            '674': '674@fuelcards-system.com'
-        };
-
-        const email = (gadud === 'admin' || gadud === 'מנהל מערכת') ? adminEmail : gadudEmails[gadud];
-        if (!email) {
-            this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
-            return;
-        }
-
-        try {
-            if (!window.signInWithEmailAndPassword) {
-                this.showLoginStatus('שגיאה: Firebase Auth לא זמין', 'error');
-                return;
-            }
-
-            await window.signInWithEmailAndPassword(window.auth, email, password);
-            // מאזין onAuthStateChanged ידאג ל-showMainInterface + טעינת נתונים
-            this.showStatus('התחברות הצליחה', 'success');
-        } catch (error) {
-            console.error('❌ שגיאה בהתחברות:', error);
-            this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
-        }
+        return this.authManager.login();
     }
 
     showLoginStatus(message, type) {
-        const statusDiv = document.getElementById('loginStatus');
-        statusDiv.textContent = message;
-        statusDiv.className = `status ${type}`;
-        statusDiv.style.display = 'block';
-        
-        setTimeout(() => {
-            statusDiv.style.display = 'none';
-        }, 3000);
+        this.uiManager.showLoginStatus(message, type);
     }
 
     updateInterfaceByPermissions() {
-        const user = this.currentUser;
-        if (!user) return;
-
-        // עדכן את המידע על המשתמש
-        const userInfo = document.getElementById('currentUserInfo');
-        const userInfoDiv = document.getElementById('userInfo');
-        const adminPanelBtn = document.getElementById('adminPanelBtn');
-        const editCardBtn = document.getElementById('editCardBtn');
-        
-        if (user.isAdmin) {
-            userInfo.textContent = `${user.name} - מנהל מערכת`;
-            if (adminPanelBtn) adminPanelBtn.style.display = 'inline-block';
-            if (editCardBtn) {
-                editCardBtn.style.display = 'inline-block';
-                console.log('✅ כפתור עריכת כרטיס מוצג למנהל מערכת');
-            } else {
-                console.error('❌ כפתור עריכת כרטיס לא נמצא ב-DOM');
-            }
-        } else {
-            userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
-            if (adminPanelBtn) adminPanelBtn.style.display = 'none';
-            if (editCardBtn) editCardBtn.style.display = 'none';
-        }
-        
-        userInfoDiv.style.display = 'block';
-        
-        // עדכן את פקדי המיון והסינון
-        this.updateAdminSortingControls();
-        
-        // הסתר/הצג כפתורים לפי הרשאות
-        this.updateButtonVisibility();
-        this.updateBulkIssueUI();
-        
-        // עדכן את הטבלה לפי הרשאות
-        this.renderTable();
+        this.uiManager.updateInterfaceByPermissions();
     }
     
     // עדכון פקדי מיון וסינון לכל משתמש מחובר
     updateAdminSortingControls() {
-        const adminSortingControls = document.getElementById('adminSortingControls');
-        if (!adminSortingControls) {
-            return;
-        }
-
-        adminSortingControls.style.display = this.currentUser ? 'block' : 'none';
+        this.uiManager.updateAdminSortingControls();
     }
 
     // עדכון נראות כפתורים לפי הרשאות
     updateButtonVisibility() {
-        const user = this.currentUser;
-        if (!user) return;
-
-        // כפתורי ניפוק/עדכון/החזרת כרטיס - רק למנהל
-        const adminButtons = [
-            'button[onclick*="showTypingForm(\'new\')"]',
-            'button[onclick*="showTypingForm(\'update\')"]',
-            'button[onclick*="showTypingForm(\'return\')"]'
-        ];
-
-        // כפתורי פעולות גדודיות - לכולם
-        const gadudButtons = [
-            'button[onclick*="showTypingForm(\'gadud_new\')"]',
-            'button[onclick*="showTypingForm(\'gadud_update\')"]',
-            'button[onclick*="showTypingForm(\'gadud_return\')"]'
-        ];
-
-        // כפתור זיכוי רצף - רק למנהל
-        const batchCreditBtn = document.getElementById('batchCreditBtn');
-        if (batchCreditBtn) {
-            batchCreditBtn.style.display = user.isAdmin ? 'block' : 'none';
-        }
-
-        // כפתור החזרה רצף - רק למנהל
-        const batchReturnBtn = document.getElementById('batchReturnBtn');
-        if (batchReturnBtn) {
-            batchReturnBtn.style.display = user.isAdmin ? 'block' : 'none';
-        }
-
-        // מצא את כל ה-control-card divs של ניפוק/עדכון/החזרת כרטיס
-        const controlCards = document.querySelectorAll('.control-card');
-        const adminControlCards = [];
-        
-        controlCards.forEach(card => {
-            const h3 = card.querySelector('h3');
-            if (h3) {
-                const title = h3.textContent.trim();
-                if (title === 'ניפוק כרטיס חדש' || title === 'עדכון כרטיס' || title === 'החזרת כרטיס') {
-                    adminControlCards.push(card);
-                }
-            }
-        });
-
-        if (user.isAdmin) {
-            // מנהל - הצג הכל
-            adminButtons.forEach(selector => {
-                const buttons = document.querySelectorAll(selector);
-                buttons.forEach(btn => btn.style.display = 'block');
-            });
-            gadudButtons.forEach(selector => {
-                const buttons = document.querySelectorAll(selector);
-                buttons.forEach(btn => btn.style.display = 'block');
-            });
-            // הצג את כל הכרטיסים
-            adminControlCards.forEach(card => {
-                // מחזירים ל-`flex` כמו שהוגדר ב-CSS עבור `.control-card`
-                // כדי לשמור על יישור מרכזי עקבי.
-                card.style.display = 'flex';
-            });
-        } else {
-            // משתמש רגיל - הסתר כפתורי מנהל, הצג רק גדודיים
-            adminButtons.forEach(selector => {
-                const buttons = document.querySelectorAll(selector);
-                buttons.forEach(btn => btn.style.display = 'none');
-            });
-            gadudButtons.forEach(selector => {
-                const buttons = document.querySelectorAll(selector);
-                buttons.forEach(btn => btn.style.display = 'block');
-            });
-            // הסתר את כל הכרטיסים של ניפוק/עדכון/החזרת כרטיס
-            adminControlCards.forEach(card => {
-                card.style.display = 'none';
-            });
-        }
+        this.uiManager.updateButtonVisibility();
     }
 
     // סינון כרטיסים לפי הרשאות
@@ -2172,484 +1404,72 @@ class FuelCardManager {
 
     // זיכוי רצף - פתיחת modal
     showBatchCreditModal() {
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לבצע זיכוי רצף. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-
-        const modal = document.getElementById('batchCreditModal');
-        if (modal) {
-            modal.style.display = 'block';
-            // נקה את הבחירה הקודמת
-            document.getElementById('batchCreditGadud').value = '';
-            document.getElementById('batchCreditCardsList').innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
-            document.getElementById('executeBatchCreditBtn').style.display = 'none';
-        }
+        return this.batchManager.showBatchCreditModal();
     }
 
     // זיכוי רצף - סגירת modal
     closeBatchCreditModal() {
-        const modal = document.getElementById('batchCreditModal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        return this.batchManager.closeBatchCreditModal();
     }
 
     // זיכוי רצף - טעינת כרטיסים לפי גדוד
     loadCardsForBatchCredit() {
-        const gadud = document.getElementById('batchCreditGadud').value;
-        const cardsList = document.getElementById('batchCreditCardsList');
-        const executeBtn = document.getElementById('executeBatchCreditBtn');
-
-        if (!gadud) {
-            cardsList.innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
-            executeBtn.style.display = 'none';
-            return;
-        }
-
-        // סנן כרטיסים: שייכים לגדוד, יש להם gadudCreditDate (זוכו גדודית), אבל לא הוחזרו לגמרי
-        const eligibleCards = this.fuelCards.filter(card => {
-            return card.gadudNumber === gadud && 
-                   card.gadudCreditDate && 
-                   card.status !== 'returned' && 
-                   card.status !== 'final_return';
-        });
-
-        if (eligibleCards.length === 0) {
-            cardsList.innerHTML = '<p style="text-align: center; color: #666;">לא נמצאו כרטיסים לזיכוי בגדוד זה</p>';
-            executeBtn.style.display = 'none';
-            return;
-        }
-
-        // צור רשימה עם checkboxes
-        let html = '<div style="direction: rtl;">';
-        html += `<h4 style="margin-bottom: 15px; color: #2c3e50;">נמצאו ${eligibleCards.length} כרטיסים לזיכוי:</h4>`;
-        html += '<div style="max-height: 350px; overflow-y: auto;">';
-        
-        eligibleCards.forEach((card, index) => {
-            const cardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
-            const cardName = this.escapeHtml(card.name || 'ללא שם');
-            const gadudName = card.gadudName ? this.escapeHtml(card.gadudName) : '';
-            const remainingFuelText = card.remainingFuel !== undefined ? this.escapeHtml(String(card.remainingFuel)) : '';
-            html += `
-                <div style="
-                    padding: 12px;
-                    margin-bottom: 8px;
-                    border: 2px solid #ddd;
-                    border-radius: 8px;
-                    background: #f9f9f9;
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                ">
-                    <input 
-                        type="checkbox" 
-                        id="batchCreditCard_${cardNum}" 
-                        value="${cardNum}"
-                        style="width: 20px; height: 20px; cursor: pointer;"
-                        onchange="fuelCardManager.updateBatchCreditButton()"
-                    >
-                    <label for="batchCreditCard_${cardNum}" style="flex: 1; cursor: pointer; margin: 0;">
-                        <strong>כרטיס ${cardNum}</strong> - ${cardName}
-                        ${card.gadudName ? `(${gadudName})` : ''}
-                        ${card.remainingFuel !== undefined ? `- נשאר: ${remainingFuelText} ליטר` : ''}
-                    </label>
-                </div>
-            `;
-        });
-        
-        html += '</div></div>';
-        cardsList.innerHTML = html;
-        executeBtn.style.display = 'none';
+        return this.batchManager.loadCardsForBatchCredit();
     }
 
     // עדכון נראות כפתור ביצוע זיכוי
     updateBatchCreditButton() {
-        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]:checked');
-        const executeBtn = document.getElementById('executeBatchCreditBtn');
-        
-        if (checkboxes.length > 0) {
-            executeBtn.style.display = 'block';
-            executeBtn.textContent = `זכה ${checkboxes.length} כרטיסים נבחרים`;
-        } else {
-            executeBtn.style.display = 'none';
-        }
+        return this.batchManager.updateBatchCreditButton();
     }
 
     // בחירת כל הכרטיסים
     selectAllBatchCredit() {
-        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.checked = true;
-        });
-        this.updateBatchCreditButton();
+        return this.batchManager.selectAllBatchCredit();
     }
 
     // ביטול בחירת כל הכרטיסים
     deselectAllBatchCredit() {
-        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.checked = false;
-        });
-        this.updateBatchCreditButton();
+        return this.batchManager.deselectAllBatchCredit();
     }
 
     // ביצוע זיכוי על כל הכרטיסים שנבחרו
     async executeBatchCredit() {
-        const checkboxes = document.querySelectorAll('#batchCreditCardsList input[type="checkbox"]:checked');
-        
-        if (checkboxes.length === 0) {
-            this.showStatus('לא נבחרו כרטיסים לזיכוי', 'error');
-            return;
-        }
-
-        // הצגת חלונית אישור
-        const cardNumbers = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
-        const confirmMessage = `האם אתה בטוח שברצונך לזכות ${cardNumbers.length} כרטיסים?\n\nכרטיסים: ${cardNumbers.join(', ')}`;
-        
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-
-        // ביצוע זיכוי על כל הכרטיסים
-        this.showStatus(`מבצע זיכוי על ${cardNumbers.length} כרטיסים...`, 'processing');
-        
-        let successCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        // מיפוי כדי להימנע מ-`findIndex` לכל כרטיס (חוסך המון זמן בבאץ'ים גדולים)
-        const cardIndexByNumber = new Map();
-        this.fuelCards.forEach((card, idx) => {
-            const raw = card ? card.cardNumber : null;
-            const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
-            if (Number.isFinite(n)) {
-                cardIndexByNumber.set(n, idx);
-            }
-        });
-
-        const concurrency = Math.max(1, Math.min(8, cardNumbers.length));
-        let cursor = 0;
-
-        const worker = async () => {
-            while (true) {
-                const cardNum = cardNumbers[cursor++];
-                if (cardNum === undefined) return;
-
-                try {
-                    const cardIndex = cardIndexByNumber.get(cardNum);
-                    if (cardIndex === undefined) {
-                        errors.push(`כרטיס ${cardNum} לא נמצא`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    const card = this.fuelCards[cardIndex];
-
-                    // בדיקה שהכרטיס לא הוחזר לגמרי
-                    if (card.status === 'returned' || card.status === 'final_return') {
-                        errors.push(`כרטיס ${cardNum} כבר הוחזר לגמרי`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    // עדכון הכרטיס - החזרה (זיכוי סופי)
-                    const now = this.formatDateTime();
-                    card.status = 'returned';
-                    card.date = now;
-                    card.creditDate = now;
-
-                    // הוסף לשרשרת העברת כרטיס
-                    if (!card.cardChain) {
-                        card.cardChain = [];
-                    }
-                    card.cardChain.push({
-                        action: 'החזרת כרטיס (זיכוי רצף)',
-                        amount: card.amount,
-                        date: now,
-                        status: 'returned'
-                    });
-
-                    // שמירה ב-Firebase
-                    await this.updateCardInFirebase(card);
-                    successCount++;
-                } catch (error) {
-                    console.error(`שגיאה בזיכוי כרטיס ${cardNum}:`, error);
-                    errors.push(`כרטיס ${cardNum}: ${error.message}`);
-                    errorCount++;
-                }
-            }
-        };
-
-        await Promise.all(Array.from({ length: concurrency }, worker));
-
-        // עדכון הטבלה
-        this.renderTable();
-
-        // סגירת ה-modal
-        this.closeBatchCreditModal();
-
-        // הצגת תוצאות
-        if (errorCount === 0) {
-            this.showStatus(`זיכוי הושלם בהצלחה! ${successCount} כרטיסים זוכו.`, 'success');
-        } else {
-            const errorMsg = `זיכוי הושלם חלקית: ${successCount} כרטיסים זוכו, ${errorCount} שגיאות.\n${errors.join('\n')}`;
-            this.showStatus(errorMsg, 'error');
-        }
+        return this.batchManager.executeBatchCredit();
     }
 
     // החזרה רצף - פתיחת modal
     showBatchReturnModal() {
-        if (!this.currentUser || !this.currentUser.isAdmin) {
-            this.showStatus('אין לך הרשאה לבצע החזרה רצף. רק מנהל מערכת יכול לבצע פעולה זו.', 'error');
-            return;
-        }
-
-        const modal = document.getElementById('batchReturnModal');
-        if (modal) {
-            modal.style.display = 'block';
-            // נקה את הבחירה הקודמת
-            document.getElementById('batchReturnGadud').value = '';
-            document.getElementById('batchReturnCardsList').innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
-            document.getElementById('executeBatchReturnBtn').style.display = 'none';
-        }
+        return this.batchManager.showBatchReturnModal();
     }
 
     // החזרה רצף - סגירת modal
     closeBatchReturnModal() {
-        const modal = document.getElementById('batchReturnModal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        return this.batchManager.closeBatchReturnModal();
     }
 
     // החזרה רצף - טעינת כרטיסים לפי גדוד
     loadCardsForBatchReturn() {
-        const gadud = document.getElementById('batchReturnGadud').value;
-        const cardsList = document.getElementById('batchReturnCardsList');
-        const executeBtn = document.getElementById('executeBatchReturnBtn');
-
-        if (!gadud) {
-            cardsList.innerHTML = '<p style="text-align: center; color: #666;">בחר גדוד כדי לראות כרטיסים</p>';
-            executeBtn.style.display = 'none';
-            return;
-        }
-
-        // סנן כרטיסים: שייכים לגדוד, יש להם gadudCreditDate (זוכו גדודית), 
-        // remainingFuel = 0 (אין דלק שנותר), ולא הוחזרו לגמרי
-        const eligibleCards = this.fuelCards.filter(card => {
-            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
-                ? Number(card.remainingFuel) 
-                : null;
-            return card.gadudNumber === gadud && 
-                   card.gadudCreditDate && 
-                   (remaining === null || remaining === 0) &&
-                   card.status !== 'returned' && 
-                   card.status !== 'final_return';
-        });
-
-        if (eligibleCards.length === 0) {
-            cardsList.innerHTML = '<p style="text-align: center; color: #666;">לא נמצאו כרטיסים להחזרה בגדוד זה (צריך זיכוי גדודי מלא - כמות שנותרה = 0)</p>';
-            executeBtn.style.display = 'none';
-            return;
-        }
-
-        // צור רשימה עם checkboxes
-        let html = '<div style="direction: rtl;">';
-        html += `<h4 style="margin-bottom: 15px; color: #2c3e50;">נמצאו ${eligibleCards.length} כרטיסים להחזרה:</h4>`;
-        html += '<div style="max-height: 350px; overflow-y: auto;">';
-        
-        eligibleCards.forEach((card, index) => {
-            const cardNum = typeof card.cardNumber === 'string' ? parseInt(card.cardNumber, 10) : card.cardNumber;
-            const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null 
-                ? Number(card.remainingFuel) 
-                : 0;
-            const cardName = this.escapeHtml(card.name || 'ללא שם');
-            const gadudName = card.gadudName ? this.escapeHtml(card.gadudName) : '';
-            const gadudCreditDate = card.gadudCreditDate ? this.escapeHtml(String(card.gadudCreditDate)) : '';
-            html += `
-                <div style="
-                    padding: 12px;
-                    margin-bottom: 8px;
-                    border: 2px solid #ddd;
-                    border-radius: 8px;
-                    background: #f9f9f9;
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                ">
-                    <input 
-                        type="checkbox" 
-                        id="batchReturnCard_${cardNum}" 
-                        value="${cardNum}"
-                        style="width: 20px; height: 20px; cursor: pointer;"
-                        onchange="fuelCardManager.updateBatchReturnButton()"
-                    >
-                    <label for="batchReturnCard_${cardNum}" style="flex: 1; cursor: pointer; margin: 0;">
-                        <strong>כרטיס ${cardNum}</strong> - ${cardName}
-                        ${card.gadudName ? `(${gadudName})` : ''}
-                        ${remaining === 0 ? '- כמות שנותרה: 0 ליטר ✓' : ''}
-                        ${card.gadudCreditDate ? `- זיכוי גדודי: ${gadudCreditDate}` : ''}
-                    </label>
-                </div>
-            `;
-        });
-        
-        html += '</div></div>';
-        cardsList.innerHTML = html;
-        executeBtn.style.display = 'none';
+        return this.batchManager.loadCardsForBatchReturn();
     }
 
     // עדכון נראות כפתור ביצוע החזרה
     updateBatchReturnButton() {
-        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]:checked');
-        const executeBtn = document.getElementById('executeBatchReturnBtn');
-        
-        if (checkboxes.length > 0) {
-            executeBtn.style.display = 'block';
-            executeBtn.textContent = `החזר ${checkboxes.length} כרטיסים נבחרים`;
-        } else {
-            executeBtn.style.display = 'none';
-        }
+        return this.batchManager.updateBatchReturnButton();
     }
 
     // בחירת כל הכרטיסים להחזרה
     selectAllBatchReturn() {
-        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.checked = true;
-        });
-        this.updateBatchReturnButton();
+        return this.batchManager.selectAllBatchReturn();
     }
 
     // ביטול בחירת כל הכרטיסים להחזרה
     deselectAllBatchReturn() {
-        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            cb.checked = false;
-        });
-        this.updateBatchReturnButton();
+        return this.batchManager.deselectAllBatchReturn();
     }
 
     // ביצוע החזרה על כל הכרטיסים שנבחרו
     async executeBatchReturn() {
-        const checkboxes = document.querySelectorAll('#batchReturnCardsList input[type="checkbox"]:checked');
-        
-        if (checkboxes.length === 0) {
-            this.showStatus('לא נבחרו כרטיסים להחזרה', 'error');
-            return;
-        }
-
-        // הצגת חלונית אישור
-        const cardNumbers = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
-        const confirmMessage = `האם אתה בטוח שברצונך להחזיר ${cardNumbers.length} כרטיסים?\n\nכרטיסים: ${cardNumbers.join(', ')}`;
-        
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-
-        // ביצוע החזרה על כל הכרטיסים
-        this.showStatus(`מבצע החזרה על ${cardNumbers.length} כרטיסים...`, 'processing');
-        
-        let successCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        // מיפוי כדי להימנע מ-`findIndex` לכל כרטיס
-        const cardIndexByNumber = new Map();
-        this.fuelCards.forEach((card, idx) => {
-            const raw = card ? card.cardNumber : null;
-            const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
-            if (Number.isFinite(n)) {
-                cardIndexByNumber.set(n, idx);
-            }
-        });
-
-        const concurrency = Math.max(1, Math.min(8, cardNumbers.length));
-        let cursor = 0;
-
-        const worker = async () => {
-            while (true) {
-                const cardNum = cardNumbers[cursor++];
-                if (cardNum === undefined) return;
-
-                try {
-                    const cardIndex = cardIndexByNumber.get(cardNum);
-                    if (cardIndex === undefined) {
-                        errors.push(`כרטיס ${cardNum} לא נמצא`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    const card = this.fuelCards[cardIndex];
-
-                    // בדיקה שהכרטיס לא הוחזר לגמרי
-                    if (card.status === 'returned' || card.status === 'final_return') {
-                        errors.push(`כרטיס ${cardNum} כבר הוחזר לגמרי`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    // בדיקה שיש זיכוי גדודי
-                    if (!card.gadudCreditDate) {
-                        errors.push(`כרטיס ${cardNum} - לא ניתן להחזיר לפני ביצוע זיכוי גדודי`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    // בדיקה שכמות שנותרה היא 0
-                    const remaining = card.remainingFuel !== undefined && card.remainingFuel !== null
-                        ? Number(card.remainingFuel)
-                        : null;
-                    if (remaining !== null && (Number.isNaN(remaining) || remaining !== 0)) {
-                        errors.push(`כרטיס ${cardNum} - לא ניתן להחזיר לפני זיכוי גדודי מלא (כמות שנותרה חייבת להיות 0)`);
-                        errorCount++;
-                        continue;
-                    }
-
-                    // עדכון הכרטיס - החזרה (זיכוי סופי)
-                    const now = this.formatDateTime();
-                    card.status = 'returned';
-                    card.date = now;
-                    card.creditDate = now;
-
-                    // הוסף לשרשרת העברת כרטיס
-                    if (!card.cardChain) {
-                        card.cardChain = [];
-                    }
-                    card.cardChain.push({
-                        action: 'החזרת כרטיס (החזרה רצף)',
-                        amount: card.amount,
-                        date: now,
-                        status: 'returned'
-                    });
-
-                    // שמירה ב-Firebase
-                    await this.updateCardInFirebase(card);
-                    successCount++;
-                } catch (error) {
-                    console.error(`שגיאה בהחזרת כרטיס ${cardNum}:`, error);
-                    errors.push(`כרטיס ${cardNum}: ${error.message}`);
-                    errorCount++;
-                }
-            }
-        };
-
-        await Promise.all(Array.from({ length: concurrency }, worker));
-
-        // עדכון הטבלה
-        this.renderTable();
-
-        // סגירת ה-modal
-        this.closeBatchReturnModal();
-
-        // הצגת תוצאות
-        if (errorCount === 0) {
-            this.showStatus(`החזרה הושלמה בהצלחה! ${successCount} כרטיסים הוחזרו.`, 'success');
-        } else {
-            const errorMsg = `החזרה הושלמה חלקית: ${successCount} כרטיסים הוחזרו, ${errorCount} שגיאות.\n${errors.join('\n')}`;
-            this.showStatus(errorMsg, 'error');
-        }
+        return this.batchManager.executeBatchReturn();
     }
 
     showSystemInfo() {
