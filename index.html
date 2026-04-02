@@ -959,7 +959,7 @@
     <div id="splashScreen" class="splash-screen">
         <div class="splash-content">
             <div class="splash-logo">
-                <img src="logo.png" alt="אגד הטנ״א" class="logo-image" id="splashLogo" onerror="this.style.display='none'; document.querySelector('.logo-icon').style.display='block';">
+                <img src="logo.png" alt="אגד הטנ״א" class="logo-image" id="splashLogo">
                 <div class="logo-icon" style="display: none;">⛽</div>
                 <h1 class="splash-title">אגד הטנ״א,</h1>
                 <p class="splash-subtitle">מניעים את</p>
@@ -988,7 +988,7 @@
             </div>
             <div id="userInfo" style="margin-top: 15px; display: none;">
                 <span id="currentUserInfo"></span>
-                <button onclick="fuelCardManager.showEditCardForm()" id="editCardBtn" style="
+                <button data-action="showEditCardForm" id="editCardBtn" style="
                     background: rgba(255,255,255,0.2);
                     color: white;
                     border: 1px solid rgba(255,255,255,0.3);
@@ -999,7 +999,7 @@
                     font-size: 14px;
                     display: none;
                 ">עריכת כרטיס</button>
-                <button onclick="fuelCardManager.logout()" style="
+                <button data-action="logout" style="
                     background: rgba(255,255,255,0.2);
                     color: white;
                     border: 1px solid rgba(255,255,255,0.3);
@@ -1015,42 +1015,42 @@
         <div class="controls">
             <div class="control-card">
                 <h3>ניפוק כרטיס חדש</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('new'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="new">
                     הקלד ניפוק
                 </button>
             </div>
 
             <div class="control-card">
                 <h3>עדכון כרטיס</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('update'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="update">
                     הקלד עדכון
                 </button>
             </div>
 
             <div class="control-card">
                 <h3>החזרת כרטיס</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('return'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="return">
                     הקלד החזרה
                 </button>
             </div>
 
             <div class="control-card">
                 <h3>ניפוק גדודי</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_new'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="gadud_new">
                     הקלד ניפוק גדודי
                 </button>
             </div>
 
             <div class="control-card">
                 <h3>עדכון גדודי</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_update'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="gadud_update">
                     הקלד עדכון גדודי
                 </button>
             </div>
 
             <div class="control-card">
                 <h3>זיכוי גדודי</h3>
-                <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_return'); } else { console.error('showTypingForm not found'); }">
+                <button class="type-btn" data-action="showTypingForm" data-form-action="gadud_return">
                     הקלד זיכוי גדודי
                 </button>
             </div>
@@ -1065,14 +1065,14 @@
             aria-labelledby="statusModalTitle"
             aria-describedby="statusModalMessage"
             aria-hidden="true"
-            onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+
         >
-            <div class="status-modal__dialog" onclick="event.stopPropagation();">
+            <div class="status-modal__dialog">
                 <button
                     type="button"
                     class="status-modal__close"
                     aria-label="סגור הודעה"
-                    onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+
                 >
                     X
                 </button>
@@ -1083,7 +1083,7 @@
                     <button
                         type="button"
                         class="status-modal__action"
-                        onclick="if(window.fuelCardManager){ window.fuelCardManager.closeStatusModal(); }"
+
                     >
                         הבנתי
                     </button>
@@ -1124,12 +1124,12 @@
                 <label for="newAmount">כמות ליטר:</label>
                 <div class="amount-selector" data-amount-selector="newAmount">
                     <div class="amount-buttons">
-                        <button type="button" class="amount-option" data-amount-value="50" onclick="selectAmount('newAmount', 50, this)">50 ליטר</button>
-                        <button type="button" class="amount-option" data-amount-value="100" onclick="selectAmount('newAmount', 100, this)">100 ליטר</button>
-                        <button type="button" class="amount-option" data-amount-value="other" onclick="selectAmount('newAmount', 'other', this)">אחר</button>
+                        <button type="button" class="amount-option" data-amount-value="50">50 ליטר</button>
+                        <button type="button" class="amount-option" data-amount-value="100">100 ליטר</button>
+                        <button type="button" class="amount-option" data-amount-value="other">אחר</button>
                     </div>
                     <div class="amount-custom">
-                        <input type="number" id="newAmount" placeholder="הקלד כמות ליטר" min="1" oninput="handleCustomAmountInput('newAmount')">
+                        <input type="number" id="newAmount" placeholder="הקלד כמות ליטר" min="1">
                     </div>
                 </div>
             </div>
@@ -1137,13 +1137,13 @@
                 <label for="newFuelType">סוג דלק:</label>
                 <div class="fuel-type-selector" data-fuel-selector="newFuelType">
                     <div class="fuel-type-buttons">
-                        <button type="button" class="fuel-type-option" data-fuel-value="בנזין" onclick="selectFuelType('newFuelType', 'בנזין', this)">בנזין</button>
-                        <button type="button" class="fuel-type-option" data-fuel-value="סולר" onclick="selectFuelType('newFuelType', 'סולר', this)">סולר</button>
-                        <button type="button" class="fuel-type-option" data-fuel-value="אוריאה" onclick="selectFuelType('newFuelType', 'אוריאה', this)">אוריאה</button>
-                        <button type="button" class="fuel-type-option" data-fuel-value="other" onclick="selectFuelType('newFuelType', 'other', this)">אחר</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="בנזין">בנזין</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="סולר">סולר</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="אוריאה">אוריאה</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="other">אחר</button>
                     </div>
                     <div class="fuel-type-custom">
-                        <input type="text" id="newFuelType" placeholder="הקלד סוג דלק" oninput="handleCustomFuelInput('newFuelType')">
+                        <input type="text" id="newFuelType" placeholder="הקלד סוג דלק">
                     </div>
                 </div>
             </div>
@@ -1152,8 +1152,8 @@
                 <input type="datetime-local" id="newIssueDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitNewCard()">הוסף כרטיס</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitNewCard">הוסף כרטיס</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1169,8 +1169,8 @@
                 <input type="number" id="updateAmount" placeholder="הכנס כמות ליטר חדשה">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitUpdateCard()">עדכן כרטיס</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitUpdateCard">עדכן כרטיס</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1186,8 +1186,8 @@
                 <input type="datetime-local" id="returnCreditDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitReturnCard()">החזר כרטיס</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitReturnCard">החזר כרטיס</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1207,8 +1207,8 @@
                 <input type="datetime-local" id="gadudIssueDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitGadudNew()">הוסף ניפוק גדודי</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitGadudNew">הוסף ניפוק גדודי</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1228,8 +1228,8 @@
                 <input type="number" id="gadudUpdateRemainingFuel" placeholder="הכנס כמות דלק שנשאר">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitGadudUpdate()">עדכן ניפוק גדודי</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitGadudUpdate">עדכן ניפוק גדודי</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1249,8 +1249,8 @@
                 <input type="datetime-local" id="gadudCreditDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
             </div>
             <div class="form-buttons">
-                <button class="submit-btn" onclick="submitGadudReturn()">זיכוי גדודי</button>
-                <button class="cancel-btn" onclick="hideTypingForm()">ביטול</button>
+                <button class="submit-btn" data-action="submitGadudReturn">זיכוי גדודי</button>
+                <button class="cancel-btn" data-action="hideTypingForm">ביטול</button>
             </div>
         </div>
 
@@ -1263,7 +1263,7 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">מיון לפי:</label>
-                        <select id="sortBy" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                        <select id="sortBy" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                             <option value="none">ללא מיון</option>
                             <option value="date_asc">תאריך ניפוק - מהישן לחדש</option>
                             <option value="date_desc">תאריך ניפוק - מהחדש לישן</option>
@@ -1275,7 +1275,7 @@
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי סטטוס:</label>
-                        <select id="statusFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                        <select id="statusFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                             <option value="all">הכל</option>
                             <option value="returned">הוחזרו</option>
                             <option value="not_returned">לא הוחזרו</option>
@@ -1285,7 +1285,7 @@
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">תצוגה לפי גדוד:</label>
-                        <select id="gadudFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                        <select id="gadudFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                             <option value="all">כל הגדודים</option>
                             <option value="650">גדוד 650</option>
                             <option value="703">גדוד 703</option>
@@ -1300,7 +1300,7 @@
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי סוג דלק:</label>
-                        <select id="fuelTypeFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                        <select id="fuelTypeFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                             <option value="all">כל סוגי הדלק</option>
                             <option value="בנזין">בנזין</option>
                             <option value="סולר">סולר</option>
@@ -1314,12 +1314,12 @@
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי תאריך ניפוק:</label>
                         <div style="display: flex; gap: 8px;">
-                            <select id="yearFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                            <select id="yearFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                                 <option value="all">כל השנים</option>
                                 <option value="2025">2025</option>
                                 <option value="2026">2026</option>
                             </select>
-                            <select id="monthFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                            <select id="monthFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">
                                 <option value="all">כל החודשים</option>
                                 <option value="1">ינואר</option>
                                 <option value="2">פברואר</option>
@@ -1337,7 +1337,7 @@
                         </div>
                     </div>
                 </div>
-                <button onclick="fuelCardManager.resetSortingAndFiltering()" style="
+                <button data-action="resetSortingAndFiltering" style="
                     background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
                     color: white;
                     border: none;
@@ -1360,8 +1360,8 @@
                             font-size: 0.95em;
                             min-width: 250px;
                             box-sizing: border-box;
-                        " onkeyup="if(window.fuelCardManager) window.fuelCardManager.filterTable()" onkeypress="if(event.key === 'Enter') { if(window.fuelCardManager) window.fuelCardManager.filterTable(); }">
-                        <button onclick="if(window.fuelCardManager) window.fuelCardManager.filterTable()" style="
+                        ">
+                        <button data-action="filterTable" data-hover-bg="#2d5016" data-default-bg="#3d6b1f" style="
                             background: #3d6b1f;
                             color: white;
                             border: none;
@@ -1371,8 +1371,8 @@
                             cursor: pointer;
                             font-weight: 500;
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.background='#2d5016'" onmouseout="this.style.background='#3d6b1f'">חיפוש</button>
-                        <button onclick="document.getElementById('searchInput').value=''; if(window.fuelCardManager) window.fuelCardManager.filterTable();" style="
+                        ">חיפוש</button>
+                        <button data-action="clearSearch" data-hover-bg="#4a4a4a" data-default-bg="#6a6a6a" style="
                             background: #6a6a6a;
                             color: white;
                             border: none;
@@ -1382,9 +1382,9 @@
                             cursor: pointer;
                             font-weight: 500;
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.background='#4a4a4a'" onmouseout="this.style.background='#6a6a6a'">ניקוי</button>
+                        ">ניקוי</button>
                     </div>
-                    <button class="download-btn" onclick="downloadExcel()">הורד Excel</button>
+                    <button class="download-btn" data-action="downloadExcel">הורד Excel</button>
                 </div>
             </div>
             
@@ -1524,7 +1524,7 @@
                         <option value="admin">מנהל מערכת</option>
                     </select>
                 </div>
-                <button onclick="fuelCardManager.login()" style="
+                <button data-action="login" data-hover-bg="#2d5016" data-default-bg="#3d6b1f" style="
                     background: #3d6b1f;
                     color: white;
                     border: none;
@@ -1536,7 +1536,7 @@
                     width: 100%;
                     font-weight: 500;
                     transition: all 0.2s ease;
-                " onmouseover="this.style.background='#2d5016'" onmouseout="this.style.background='#3d6b1f'">התחבר</button>
+                ">התחבר</button>
                 <div id="loginStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
             </div>
         </div>
@@ -1637,6 +1637,8 @@
                 await loadScript('fuelCardsTableRenderer.js');
                 await loadScript('fuelCardsService.js');
                 await loadScript('fuelCardDialogs.js');
+                await loadScript('fuelCardAuth.js');
+                await loadScript('fuelCardEditFlow.js');
                 await loadScript('script-firebase.js');
             } catch (e) {
                 console.error('❌ טעינת סקריפטים נכשלה:', e);
