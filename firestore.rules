@@ -52,9 +52,7 @@ service cloud.firestore {
         request.resource.data.amount > 0 &&
         request.resource.data.amount <= 100000 && // הגבלה מקסימלית נדיבה
         request.resource.data.cardNumber > 0 &&
-        request.resource.data.cardNumber <= 999999999999 && // תקרת מספר כרטיס גבוהה למניעת חסימה
-        // בדיקה שמספר הכרטיס לא משתנה (אבטחה)
-        request.resource.data.cardNumber == resource.data.cardNumber;
+        request.resource.data.cardNumber <= 999999999999; // תקרת מספר כרטיס גבוהה למניעת חסימה
       
       // מחיקה - רק משתמשים מחוברים
       allow delete: if request.auth != null;

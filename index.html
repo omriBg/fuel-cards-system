@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>מערכת ניהול כרטיסי דלק</title>
     
     <!-- Content Security Policy -->
@@ -61,7 +64,7 @@
                 padding: 15px;
             }
             
-            .record-btn, .type-btn {
+            .type-btn {
                 width: 100%;
                 min-width: auto;
             }
@@ -187,36 +190,6 @@
             font-weight: 600;
         }
 
-        .record-btn {
-            background: #c0392b;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 3px;
-            font-size: 1em;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin: 0;
-            min-width: 150px;
-            font-weight: 500;
-        }
-
-        .record-btn:hover {
-            background: #a93226;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
-
-        .record-btn.recording {
-            background: #d68910;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.85; }
-            100% { opacity: 1; }
-        }
-
         .status {
             margin: 20px 0;
             padding: 12px 16px;
@@ -224,12 +197,6 @@
             font-weight: 500;
             text-align: center;
             border-left: 4px solid;
-        }
-
-        .status.recording {
-            background: #fff8e1;
-            color: #856404;
-            border-left-color: #ffc107;
         }
 
         .status.processing {
@@ -354,7 +321,6 @@
             color: #c62828;
         }
 
-        .status-modal[data-status-type="recording"] .status-modal__icon,
         .status-modal[data-status-type="processing"] .status-modal__icon {
             background: #e3f2fd;
             color: #0d47a1;
@@ -628,60 +594,6 @@
         .download-btn:hover {
             background: #2d5016;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
-
-        .voice-instructions {
-            background: #4a4a4a;
-            color: white;
-            padding: 20px;
-            margin: 20px 30px;
-            border-radius: 3px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            position: relative;
-            border-left: 4px solid #3d6b1f;
-        }
-
-        .voice-instructions h3 {
-            margin-bottom: 20px;
-            font-size: 1.4em;
-        }
-
-        .voice-instructions .instruction-content {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-            font-size: 1.1em;
-            line-height: 1.6;
-        }
-
-        .voice-instructions .example {
-            background: rgba(255,255,255,0.2);
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            border-right: 4px solid rgba(255,255,255,0.5);
-        }
-
-        .close-btn {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1.2em;
-            transition: all 0.3s ease;
-        }
-
-        .close-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: scale(1.1);
         }
 
         .type-btn {
@@ -1063,23 +975,12 @@
     <div class="container" id="mainContainer" style="display: none;">
         <div class="header">
             <h1>מערכת ניהול כרטיסי דלק</h1>
-            <p>הקלטה קולית חכמה לניהול כרטיסי דלק</p>
+            <p>ניהול כרטיסי דלק באמצעות הקלדה</p>
             <div class="developer-credit">
                 <span>פותח ע״י מדור לוגיסטיקה אגד טנא ארצי</span>
             </div>
             <div id="userInfo" style="margin-top: 15px; display: none;">
                 <span id="currentUserInfo"></span>
-                <button onclick="fuelCardManager.showAdminPanel()" id="adminPanelBtn" style="
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    padding: 8px 15px;
-                    border-radius: 20px;
-                    cursor: pointer;
-                    margin-right: 10px;
-                    font-size: 14px;
-                    display: none;
-                ">פאנל מנהל</button>
                 <button onclick="fuelCardManager.showEditCardForm()" id="editCardBtn" style="
                     background: rgba(255,255,255,0.2);
                     color: white;
@@ -1104,30 +1005,9 @@
             </div>
         </div>
 
-        <div class="instructions">
-            <h3>הוראות שימוש:</h3>
-            <ul>
-                <li><strong>הקלטה קולית:</strong> לחץ על כפתור ההקלטה ואמור את הפרטים</li>
-                <li><strong>הקלדה ידנית:</strong> לחץ על כפתור ההקלדה ומלא את הטופס</li>
-                <li><strong>ניפוק כרטיס חדש:</strong> "כרטיס 12345, יוסי כהן, 0501234567, 50 ליטר, דיזל"</li>
-                <li><strong>עדכון כרטיס:</strong> "עדכון כרטיס 12345, 30 ליטר"</li>
-                <li><strong>החזרת כרטיס:</strong> "החזרה כרטיס 12345"</li>
-                <li><strong>במקלדת:</strong> Enter לשליחה, Escape לביטול</li>
-            </ul>
-        </div>
-
-        <div id="voiceInstructions" class="voice-instructions" style="display: none;">
-            <h3>מה להגיד:</h3>
-            <div id="instructionText"></div>
-            <button onclick="hideInstructions()" class="close-btn">סגור</button>
-        </div>
-
         <div class="controls">
             <div class="control-card">
                 <h3>ניפוק כרטיס חדש</h3>
-                <button class="record-btn" onclick="startRecording('new')">
-                    הקלט ניפוק
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('new'); } else { console.error('showTypingForm not found'); }">
                     הקלד ניפוק
                 </button>
@@ -1135,9 +1015,6 @@
 
             <div class="control-card">
                 <h3>עדכון כרטיס</h3>
-                <button class="record-btn" onclick="startRecording('update')">
-                    הקלט עדכון
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('update'); } else { console.error('showTypingForm not found'); }">
                     הקלד עדכון
                 </button>
@@ -1145,9 +1022,6 @@
 
             <div class="control-card">
                 <h3>החזרת כרטיס</h3>
-                <button class="record-btn" onclick="startRecording('return')">
-                    הקלט החזרה
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('return'); } else { console.error('showTypingForm not found'); }">
                     הקלד החזרה
                 </button>
@@ -1155,9 +1029,6 @@
 
             <div class="control-card">
                 <h3>ניפוק גדודי</h3>
-                <button class="record-btn" onclick="startRecording('gadud_new')">
-                    הקלט ניפוק גדודי
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_new'); } else { console.error('showTypingForm not found'); }">
                     הקלד ניפוק גדודי
                 </button>
@@ -1165,9 +1036,6 @@
 
             <div class="control-card">
                 <h3>עדכון גדודי</h3>
-                <button class="record-btn" onclick="startRecording('gadud_update')">
-                    הקלט עדכון גדודי
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_update'); } else { console.error('showTypingForm not found'); }">
                     הקלד עדכון גדודי
                 </button>
@@ -1175,9 +1043,6 @@
 
             <div class="control-card">
                 <h3>זיכוי גדודי</h3>
-                <button class="record-btn" onclick="startRecording('gadud_return')">
-                    הקלט זיכוי גדודי
-                </button>
                 <button class="type-btn" onclick="if(typeof showTypingForm === 'function') { showTypingForm('gadud_return'); } else { console.error('showTypingForm not found'); }">
                     הקלד זיכוי גדודי
                 </button>
@@ -1267,24 +1132,12 @@
                     <div class="fuel-type-buttons">
                         <button type="button" class="fuel-type-option" data-fuel-value="בנזין" onclick="selectFuelType('newFuelType', 'בנזין', this)">בנזין</button>
                         <button type="button" class="fuel-type-option" data-fuel-value="סולר" onclick="selectFuelType('newFuelType', 'סולר', this)">סולר</button>
+                        <button type="button" class="fuel-type-option" data-fuel-value="אוריאה" onclick="selectFuelType('newFuelType', 'אוריאה', this)">אוריאה</button>
                         <button type="button" class="fuel-type-option" data-fuel-value="other" onclick="selectFuelType('newFuelType', 'other', this)">אחר</button>
                     </div>
                     <div class="fuel-type-custom">
                         <input type="text" id="newFuelType" placeholder="הקלד סוג דלק" oninput="handleCustomFuelInput('newFuelType')">
                     </div>
-                </div>
-            </div>
-            <div id="bulkIssueControls" class="bulk-issue">
-                <div class="bulk-issue__header">
-                    <h5>מקבץ ניפוק (מנהל מערכת)</h5>
-                    <span id="bulkIssueStatus" class="bulk-issue__status">כבוי</span>
-                </div>
-                <p class="bulk-issue__hint">
-                    במצב מקבץ, שם, טלפון ומספר גדוד נשמרים לניפוקים נוספים עבור אותו גורם.
-                </p>
-                <div class="bulk-issue__actions">
-                    <button type="button" class="bulk-btn primary" onclick="activateBulkIssue()">שמור מקבץ</button>
-                    <button type="button" class="bulk-btn secondary" onclick="deactivateBulkIssue()">בטל מקבץ</button>
                 </div>
             </div>
             <div class="form-group">
@@ -1417,11 +1270,10 @@
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי סטטוס:</label>
                         <select id="statusFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
                             <option value="all">הכל</option>
-                            <option value="not_credited">לא זוכו (פעילים)</option>
-                            <option value="credited">זוכו</option>
-                            <option value="new">חדשים</option>
-                            <option value="updated">עודכנו</option>
                             <option value="returned">הוחזרו</option>
+                            <option value="not_returned">לא הוחזרו</option>
+                            <option value="gadud_credited">זוכו גדודית</option>
+                            <option value="gadud_not_credited">לא זוכו</option>
                         </select>
                     </div>
                     <div>
@@ -1438,6 +1290,44 @@
                             <option value="674">גדוד 674</option>
                             <option value="no_gadud">ללא גדוד</option>
                         </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי סוג דלק:</label>
+                        <select id="fuelTypeFilter" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                            <option value="all">כל סוגי הדלק</option>
+                            <option value="בנזין">בנזין</option>
+                            <option value="סולר">סולר</option>
+                            <option value="דיזל">דיזל</option>
+                            <option value="גז">גז</option>
+                            <option value="חשמל">חשמל</option>
+                            <option value="היברידי">היברידי</option>
+                            <option value="אוריאה">אוריאה</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">סינון לפי תאריך ניפוק:</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="yearFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                                <option value="all">כל השנים</option>
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                            </select>
+                            <select id="monthFilter" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;" onchange="fuelCardManager.applySortingAndFiltering()">
+                                <option value="all">כל החודשים</option>
+                                <option value="1">ינואר</option>
+                                <option value="2">פברואר</option>
+                                <option value="3">מרץ</option>
+                                <option value="4">אפריל</option>
+                                <option value="5">מאי</option>
+                                <option value="6">יוני</option>
+                                <option value="7">יולי</option>
+                                <option value="8">אוגוסט</option>
+                                <option value="9">ספטמבר</option>
+                                <option value="10">אוקטובר</option>
+                                <option value="11">נובמבר</option>
+                                <option value="12">דצמבר</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <button onclick="fuelCardManager.resetSortingAndFiltering()" style="
@@ -1517,16 +1407,6 @@
                 ">
                     <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">פעילים</div>
                     <div id="statActive" style="font-size: 1.8em; font-weight: 600; color: #1976d2;">0</div>
-                </div>
-                <div class="stat-card" style="
-                    background: #ffffff;
-                    border: 1px solid #e0e0e0;
-                    border-left: 4px solid #4caf50;
-                    padding: 15px;
-                    border-radius: 3px;
-                ">
-                    <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">חדשים</div>
-                    <div id="statNew" style="font-size: 1.8em; font-weight: 600; color: #2e7d32;">0</div>
                 </div>
                 <div class="stat-card" style="
                     background: #ffffff;

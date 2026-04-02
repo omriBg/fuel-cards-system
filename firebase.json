@@ -5,8 +5,10 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
+      "firebase-service-account.json",
       "*.docx",
-      "*.pdf"
+      "*.pdf",
+      "delete-cards-console.js"
     ],
     "rewrites": [
       {

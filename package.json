@@ -1,7 +1,7 @@
 {
   "name": "fuel-card-manager",
   "version": "1.0.0",
-  "description": "מערכת ניהול כרטיסי דלק עם הקלטה קולית",
+  "description": "מערכת ניהול כרטיסי דלק",
   "main": "index.html",
   "scripts": {
     "start": "python -m http.server 8000",
@@ -12,8 +12,7 @@
   "keywords": [
     "fuel",
     "cards",
-    "voice",
-    "recognition",
+    "typing",
     "hebrew",
     "management"
   ],

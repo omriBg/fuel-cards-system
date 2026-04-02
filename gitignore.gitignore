@@ -1,0 +1,16 @@
+# סביבה וירטואלית
+telegram_bot_env/
+
+# קבצי Firebase רגישים
+firebase-service-account.json
+*.json
+
+# משתני סביבה
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
