@@ -1,0 +1,44 @@
+{
+	"motd": {
+		"cloudBuildErrorAfter": 1594252800000,
+		"cloudBuildWarnAfter": 1590019200000,
+		"defaultNode10After": 1594252800000,
+		"minVersion": "3.0.5",
+		"node8DeploysDisabledAfter": 1613390400000,
+		"node8RuntimeDisabledAfter": 1615809600000,
+		"node8WarnAfter": 1600128000000,
+		"fetched": 1775124098924
+	},
+	"gemini": true,
+	"usage": true,
+	"analytics-uuid": "1ce64541-e0aa-42b0-ab86-3082e136ecd6",
+	"user": {
+		"iss": "accounts.google.com",
+		"azp": "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com",
+		"aud": "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com",
+		"sub": "104240791933626001100",
+		"email": "omri952682@gmail.com",
+		"email_verified": true,
+		"at_hash": "HvFSBkp6zp77OUsGjWu0Tw",
+		"iat": 1762263446,
+		"exp": 1762267046
+	},
+	"tokens": {
+		"expires_at": 1775127697742,
+		"refresh_token": "1//03SD1aGReELE4CgYIARAAGAMSNwF-L9Ird80R-_skge5IVfFbR39ec5qzRPfdPSR1p3Zd2oth8BJRrQcjIXL8F-FGrDLyu8AYT1c",
+		"scopes": [],
+		"access_token": "ya29.a0Aa7MYipcT9l2TTSjKS5G0DBFVG90Apgm-ojl854JV28SLq3pNpUOKME467ri7iEte2ojeQBircsRTyiPho4Cw8jmj3FVYaiaPujIRhlmCHRiGCLZSHCprneNqIm_hg7XKlkVDEnl1KTZ8rqNCc9Q-0MugtqQoPUJugOnowWCCeUZOgWcU7WtJiE8FJqC1oeWGyPGej2FpeCYo00aCgYKAfgSARASFQHGX2MihJq-ogsVIca1Ye5ae_vxQA0214",
+		"expires_in": 3599,
+		"scope": "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/cloudplatformprojects.readonly https://www.googleapis.com/auth/firebase openid",
+		"token_type": "Bearer",
+		"id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImExMGU1OGRmNTVlNzI4NTY2ZWM1NmJkYTZlYjNiZDQ1NDM5ZjM1ZDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJhY2NvdW50cy5nb29nbGUuY29tIiwiYXpwIjoiNTYzNTg0MzM1ODY5LWZncmhnbWQ0N2JxbmVraWo1aThiNXByMDNobzg0OWU2LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwiYXVkIjoiNTYzNTg0MzM1ODY5LWZncmhnbWQ0N2JxbmVraWo1aThiNXByMDNobzg0OWU2LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTA0MjQwNzkxOTMzNjI2MDAxMTAwIiwiZW1haWwiOiJvbXJpOTUyNjgyQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJhdF9oYXNoIjoiQmZYU3FFWDVTVS1HamtjLVFRWkQ4QSIsImlhdCI6MTc3NTEyNDA5OSwiZXhwIjoxNzc1MTI3Njk5fQ.O-YZdeNdNX37kV2CZjF-qV9CEGwFodtsKE7Zc-lei3N7_q5eTvzhdnBCxq5NHgS4Tl4E5lMJsIn775xcoFdCkcDC7KnKmduC8EBF0Piux56fEjOJAZDbHU-m_LUTK9cL57Q-6p4oBeXTxwuBrJ6-FSx5GnhEHZq82vsqz2CG1vLxUB2N_rMEJyZZ_gScSLDJ8U3GUVR7cOeh-CMvHNbnFpIRjzeC0HkwUHCbhQGkLH4J7iHsb8sEgmzdpKMSIykFzRUUX9Kone9h6m74KFsfzscPBZ3z00dzJwCY1ovdPZ5pAIHEJMYSSrV2NEB_1ndHjXGUNSlNqjaNLMEPsq1nzA"
+	},
+	"apiEnablementCache": {
+		"fuel-cards-system": {
+			"firestore.googleapis.com": true,
+			"cloudresourcemanager.googleapis.com": true,
+			"cloudfunctions.googleapis.com": true,
+			"runtimeconfig.googleapis.com": true
+		}
+	}
+}

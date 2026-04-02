@@ -1,63 +1,87 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Collection: fuelCards
     match /fuelCards/{cardId} {
-      // קריאה - רק משתמשים מחוברים (Firebase Authentication)
-      allow read: if request.auth != null;
-      
-      // כתיבה - רק משתמשים מחוברים + ולידציה מחמירה של הנתונים
-      allow create: if 
-        // חובה: משתמש מחובר
-        request.auth != null &&
-        // בדיקה שיש את כל השדות החובה
-        request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
-        // בדיקה שסוגי הנתונים נכונים
-        request.resource.data.cardNumber is int &&
-        request.resource.data.name is string &&
-        request.resource.data.phone is string &&
-        request.resource.data.amount is int &&
-        request.resource.data.fuelType is string &&
-        request.resource.data.gadudNumber is string &&
-        // בדיקת אורך מקסימלי (הגנה מפני התקפות)
-        request.resource.data.name.size() <= 100 &&
-        request.resource.data.phone.size() <= 20 &&
-        request.resource.data.fuelType.size() <= 50 &&
-        request.resource.data.gadudNumber.size() <= 20 &&
-        // בדיקה שהערכים חיוביים
-        request.resource.data.amount > 0 &&
-        request.resource.data.amount <= 100000 && // הגבלה מקסימלית נדיבה
-        request.resource.data.cardNumber > 0 &&
-        request.resource.data.cardNumber <= 999999999999; // תקרת מספר כרטיס גבוהה למניעת חסימה
-      
-      // עדכון - רק משתמשים מחוברים + ולידציה מחמירה
-      allow update: if 
-        // חובה: משתמש מחובר
-        request.auth != null &&
-        // בדיקה שהשדות החובה קיימים
-        request.resource.data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
-        // בדיקה שסוגי הנתונים נכונים
-        request.resource.data.cardNumber is int &&
-        request.resource.data.name is string &&
-        request.resource.data.phone is string &&
-        request.resource.data.amount is int &&
-        request.resource.data.fuelType is string &&
-        request.resource.data.gadudNumber is string &&
-        // בדיקת אורך מקסימלי
-        request.resource.data.name.size() <= 100 &&
-        request.resource.data.phone.size() <= 20 &&
-        request.resource.data.fuelType.size() <= 50 &&
-        request.resource.data.gadudNumber.size() <= 20 &&
-        // בדיקה שהערכים חיוביים
-        request.resource.data.amount > 0 &&
-        request.resource.data.amount <= 100000 && // הגבלה מקסימלית נדיבה
-        request.resource.data.cardNumber > 0 &&
-        request.resource.data.cardNumber <= 999999999999; // תקרת מספר כרטיס גבוהה למניעת חסימה
-      
-      // מחיקה - רק משתמשים מחוברים
-      allow delete: if request.auth != null;
+      // ==== Authz model (no Functions) ====
+      // ההרשאות נשענות על Firebase Auth Email של המשתמש:
+      // - Admin email: admin@fuelcards-system.com
+      // - User emails: <gadud>@fuelcards-system.com
+
+      function isAdmin() {
+        return request.auth != null && request.auth.token.email == 'admin@fuelcards-system.com';
+      }
+
+      function gadudFromEmail() {
+        // מחזיר מחרוזת (או '' אם אין התאמה)
+        return request.auth != null &&
+          request.auth.token.email is string
+          ?
+          (request.auth.token.email == '650@fuelcards-system.com' ? '650'
+          : request.auth.token.email == '703@fuelcards-system.com' ? '703'
+          : request.auth.token.email == '651@fuelcards-system.com' ? '651'
+          : request.auth.token.email == '791@fuelcards-system.com' ? '791'
+          : request.auth.token.email == '652@fuelcards-system.com' ? '652'
+          : request.auth.token.email == '638@fuelcards-system.com' ? '638'
+          : request.auth.token.email == '653@fuelcards-system.com' ? '653'
+          : request.auth.token.email == '674@fuelcards-system.com' ? '674'
+          : '')
+          : '';
+      }
+
+      function isMyGadudForRead() {
+        return request.auth != null
+          && gadudFromEmail() != ''
+          && resource.data.gadudNumber is string
+          && resource.data.gadudNumber == gadudFromEmail();
+      }
+
+      function isMyGadudForCreate() {
+        return request.auth != null
+          && gadudFromEmail() != ''
+          && request.resource.data.gadudNumber is string
+          && request.resource.data.gadudNumber == gadudFromEmail();
+      }
+
+      function isMyGadudForUpdate() {
+        // משתמש רגיל לא יכול להעביר כרטיס לגדוד אחר
+        return request.auth != null
+          && gadudFromEmail() != ''
+          && resource.data.gadudNumber is string
+          && request.resource.data.gadudNumber is string
+          && resource.data.gadudNumber == gadudFromEmail()
+          && request.resource.data.gadudNumber == resource.data.gadudNumber;
+      }
+
+      function validateFuelCardData(data) {
+        return data.keys().hasAll(['cardNumber', 'name', 'phone', 'amount', 'fuelType', 'gadudNumber']) &&
+          data.cardNumber is int &&
+          data.name is string &&
+          data.phone is string &&
+          data.amount is int &&
+          data.fuelType is string &&
+          data.gadudNumber is string &&
+          data.name.size() <= 100 &&
+          data.phone.size() <= 20 &&
+          data.fuelType.size() <= 50 &&
+          data.gadudNumber.size() <= 20 &&
+          data.amount > 0 &&
+          data.amount <= 100000 &&
+          data.cardNumber > 0 &&
+          data.cardNumber <= 999999999999;
+      }
+
+      // ==== Permissions ====
+      allow read: if isAdmin() || isMyGadudForRead();
+
+      // כדי להשאיר התנהגות כמו ה-UI: רק מנהל מנפק כרטיסים (Create)
+      allow create: if isAdmin() && validateFuelCardData(request.resource.data);
+
+      allow update: if isAdmin() || (isMyGadudForUpdate() && validateFuelCardData(request.resource.data));
+
+      // מחיקה - רק admin
+      allow delete: if isAdmin();
     }
-    
+
     // Collection אחרות - חסום לחלוטין
     match /{document=**} {
       allow read, write: if false;

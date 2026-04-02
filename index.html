@@ -619,11 +619,18 @@
             background: #ffffff;
             border-radius: 3px;
             padding: 20px;
-            margin: 20px 0;
+            margin: 20px auto;
+            max-width: 760px;
+            width: 100%;
             border: 1px solid #e0e0e0;
             border-left: 4px solid #3d6b1f;
             display: none;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        #newCardForm {
+            direction: rtl;
+            text-align: right;
         }
 
         .typing-form h4 {
@@ -1250,9 +1257,9 @@
         <div class="data-table">
             <h3 style="text-align: center; margin-bottom: 20px; color: #2c3e50;">טבלת כרטיסי דלק</h3>
             
-            <!-- פקדי מיון וסינון למנהל מערכת -->
+            <!-- פקדי מיון וסינון -->
             <div id="adminSortingControls" style="display: block; background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; direction: rtl;">
-                <h4 style="margin-bottom: 15px; color: #2c3e50;">מיון וסינון (מנהל מערכת)</h4>
+                <h4 style="margin-bottom: 15px; color: #2c3e50;">מיון וסינון</h4>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">מיון לפי:</label>
@@ -1543,7 +1550,7 @@
         // Firebase Configuration
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyDmO6XVUQmoNb-LrNP8q78qTPKrZReAJ9U",
@@ -1572,9 +1579,9 @@
         window.firebaseQuery = query;
         window.firebaseWhere = where;
         window.firebaseOrderBy = orderBy;
-        window.signInAnonymously = signInAnonymously;
         window.onAuthStateChanged = onAuthStateChanged;
         window.signOut = signOut;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
         
         // ודא ש-Firebase מוכן לפני טעינת script-firebase.js
         console.log('Firebase initialized, loading script-firebase.js...');
@@ -1610,11 +1617,31 @@
         };
         
         // טען את script-firebase.js רק אחרי ש-Firebase מוכן
-        const script = document.createElement('script');
-        script.src = 'script-firebase.js';
-        script.type = 'text/javascript';
-        script.async = false;
-        document.body.appendChild(script);
+        const loadScript = (src) => new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.type = 'text/javascript';
+            script.async = false;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.body.appendChild(script);
+        });
+
+        (async () => {
+            try {
+                await loadScript('app-constants.js');
+                await loadScript('ui-selectors.js');
+                await loadScript('cardsSelectors.js');
+                await loadScript('fuelCardsTableUI.js');
+                await loadScript('fuelCardsCellsUI.js');
+                await loadScript('fuelCardsTableRenderer.js');
+                await loadScript('fuelCardsService.js');
+                await loadScript('fuelCardDialogs.js');
+                await loadScript('script-firebase.js');
+            } catch (e) {
+                console.error('❌ טעינת סקריפטים נכשלה:', e);
+            }
+        })();
     </script>
 </body>
 </html>

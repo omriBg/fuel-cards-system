@@ -1,0 +1,21 @@
+# OS / Editor
+.DS_Store
+.vscode/
+
+# Firebase (local build/cache)
+.firebase/
+
+# Secrets
+firebase-service-account.json
+
+# Environment variables
+.env
+.env.*
+
+# Dependencies
+node_modules/
+
+# Misc
+*.log
+.Rhistory
+

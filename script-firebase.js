@@ -14,15 +14,10 @@ class FuelCardManager {
             active: false,
             data: null
         };
-        this.adminGadudContacts = {
-            '651': { name: 'דור בן לולו', phone: '054-3091641' },
-            '652': { name: 'לי נאגר', phone: '050-5559153' },
-            '653': { name: 'אביחי', phone: '050-6909403' },
-            '638': { name: 'מירב עדן בניאס', phone: '052-6889285' },
-            '674': { name: 'נועה אסולין', phone: '052-7891707' },
-            '703': { name: 'תאיר בנימיני', phone: '052-2030798' },
-            '791': { name: 'נוי רחמים', phone: '052-4831696' }
-        };
+        // Loaded from `app-constants.js` (see index.html).
+        this.adminGadudContacts = (window.APP_CONSTANTS && window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS)
+            ? window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS
+            : {};
         document.addEventListener('keydown', this.handleStatusModalKeydown);
         this.setupGadudAutoFillHandler();
         console.log('עמודות טבלה:', this.tableColumns);
@@ -49,6 +44,10 @@ class FuelCardManager {
                 }, 600);
             }
         }, 3000);
+
+        // Event delegation for the "remainingFuel" cell click.
+        // This avoids inline onclick and keeps the handler stable across re-renders.
+        this._remainingFuelClickBound = false;
     }
 
     // הגדרת event listeners לכפתורי סגירת modal
@@ -131,13 +130,22 @@ class FuelCardManager {
             
             // הצג loading state
             this.showLoadingState();
-            
-            const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
+
+            const isAdmin = !!(this.currentUser && this.currentUser.isAdmin);
+            const userGadud = this.currentUser && this.currentUser.gadud ? String(this.currentUser.gadud) : '';
+
+            // חשוב: ב-Rules החדשים משתמש רגיל רשאי לקרוא רק את הגדוד שלו.
+            // לכן אסור לבצע get-all למשתמש רגיל, אחרת נקבל permission-denied.
+            const collectionRef = window.firebaseCollection(window.db, 'fuelCards');
+            const docsQuery = (!isAdmin && userGadud && window.firebaseQuery && window.firebaseWhere)
+                ? window.firebaseQuery(collectionRef, window.firebaseWhere('gadudNumber', '==', userGadud))
+                : collectionRef;
+
+            const querySnapshot = await window.firebaseGetDocs(docsQuery);
             this.fuelCards = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
                 data.id = doc.id; // הוסף את ה-ID של המסמך
-                // נקה undefined values
                 const cleanedData = this.cleanUndefinedValues(data);
                 this.fuelCards.push(cleanedData);
             });
@@ -155,7 +163,7 @@ class FuelCardManager {
             // אם זו שגיאת permission, זה אומר ש-Authentication לא מופעל
             if (error.code === 'permission-denied') {
                 console.error('⚠️ שגיאת הרשאות - ודא ש-Anonymous Authentication מופעל ב-Firebase Console');
-                this.showStatus('שגיאה: אין הרשאות לגשת לנתונים. אנא ודא ש-Anonymous Authentication מופעל ב-Firebase Console.', 'error');
+                this.showStatus('שגיאה: אין הרשאות לגשת לנתונים. ודא שהתחברת עם סיסמת גדוד נכונה.', 'error');
                 // נסה שוב אחרי 2 שניות
                 setTimeout(() => this.loadDataFromFirebase(), 2000);
             } else {
@@ -211,13 +219,9 @@ class FuelCardManager {
         const maxAttempts = 20; // מקסימום 10 שניות
         
         while (attempts < maxAttempts) {
-            if (window.firebaseReady && window.auth && window.signInAnonymously) {
-                console.log('✅ Firebase מוכן, מתחיל תהליך Authentication...');
-                await this.initFirebaseAuth();
-                // המתן ש-Authentication יתחבר ואז טען נתונים
-                setTimeout(() => {
-                    this.loadDataFromFirebase();
-                }, 1000);
+            if (window.firebaseReady && window.auth && window.onAuthStateChanged) {
+                console.log('✅ Firebase מוכן, מגדיר מאזין Authentication...');
+                this.setupAuthStateListener();
                 return;
             }
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -226,10 +230,64 @@ class FuelCardManager {
         
         console.error('❌ Firebase לא נטען אחרי 10 שניות - מנסה בכל זאת...');
         // נסה בכל זאת
-        await this.initFirebaseAuth();
-        setTimeout(() => {
-            this.loadDataFromFirebase();
-        }, 1000);
+        this.setupAuthStateListener();
+    }
+
+    setupAuthStateListener() {
+        // מונע רישום מאזין כפול (בטעינות/רענונים)
+        if (this._authStateListenerBound) return;
+        this._authStateListenerBound = true;
+
+        window.onAuthStateChanged(window.auth, async (user) => {
+            if (!user) {
+                // אין משתמש מחובר בפועל - נחזיר לטופס
+                localStorage.removeItem('currentUser');
+                this.currentUser = null;
+                this.showLoginForm();
+                return;
+            }
+
+            const email = user.email || '';
+            const adminEmail = 'admin@fuelcards-system.com';
+            const isAdmin = email === adminEmail;
+
+            const gadudFromEmail = (mail) => {
+                const map = {
+                    '650@fuelcards-system.com': '650',
+                    '703@fuelcards-system.com': '703',
+                    '651@fuelcards-system.com': '651',
+                    '791@fuelcards-system.com': '791',
+                    '652@fuelcards-system.com': '652',
+                    '638@fuelcards-system.com': '638',
+                    '653@fuelcards-system.com': '653',
+                    '674@fuelcards-system.com': '674'
+                };
+                return map[mail] || '';
+            };
+
+            const gadud = isAdmin ? 'admin' : gadudFromEmail(email);
+            if (!gadud) {
+                // משתמש לא מזוהה מול mapping מקומי (לא אמור לקרות אם הכל הוגדר נכון)
+                await window.signOut(window.auth);
+                localStorage.removeItem('currentUser');
+                this.currentUser = null;
+                this.showLoginForm();
+                return;
+            }
+
+            const userObj = {
+                name: email,
+                gadud,
+                isAdmin,
+                loginTime: new Date().toLocaleString('he-IL')
+            };
+
+            this.setCurrentUser(userObj);
+            this.showMainInterface();
+
+            // טעינת נתונים אחרי שיש auth בפועל + Rules allow
+            setTimeout(() => this.loadDataFromFirebase(), 100);
+        });
     }
     
     // התחברות אוטומטית ל-Firebase Anonymous Authentication
@@ -288,17 +346,19 @@ class FuelCardManager {
                 console.warn('Firebase לא זמין, מדלג על שמירה');
                 return;
             }
-            
+
+            if (window.FuelCardsService && window.FuelCardsService.addCard) {
+                const docId = await window.FuelCardsService.addCard(card);
+                console.log('כרטיס נוסף ל-Firebase:', docId);
+                return docId;
+            }
+
+            // Fallback (למקרה ש-service לא נטען)
             const docRef = await window.firebaseAddDoc(
-                window.firebaseCollection(window.db, 'fuelCards'), 
+                window.firebaseCollection(window.db, 'fuelCards'),
                 card
             );
-            
-            // שמור את ה-ID של המסמך בכרטיס המקומי
-            if (card) {
-                card.id = docRef.id;
-            }
-            
+            if (card) card.id = docRef.id;
             console.log('כרטיס נוסף ל-Firebase:', docRef.id);
             return docRef.id;
         } catch (error) {
@@ -315,7 +375,14 @@ class FuelCardManager {
                 console.warn('Firebase לא זמין, מדלג על עדכון');
                 return;
             }
-            
+
+            if (window.FuelCardsService && window.FuelCardsService.updateCard) {
+                const updatedId = await window.FuelCardsService.updateCard(card);
+                console.log('כרטיס עודכן ב-Firebase:', updatedId);
+                return;
+            }
+
+            // Fallback (למקרה ש-service לא נטען)
             if (!card.id) {
                 console.error('כרטיס ללא ID - לא ניתן לעדכן');
                 // נסה למצוא את ה-ID לפי cardNumber
@@ -325,19 +392,17 @@ class FuelCardManager {
                         window.firebaseWhere('cardNumber', '==', card.cardNumber)
                     )
                 );
-                
+
                 if (querySnapshot.empty) {
                     throw new Error('כרטיס לא נמצא ב-Firebase');
                 }
-                
+
                 card.id = querySnapshot.docs[0].id;
             }
-            
+
             const cardRef = window.firebaseDoc(window.db, 'fuelCards', card.id);
-            
             // הסר את ה-id מהאובייקט לפני השמירה (Firestore לא צריך אותו)
             const { id, ...cardData } = card;
-            
             await window.firebaseUpdateDoc(cardRef, cardData);
             console.log('כרטיס עודכן ב-Firebase:', card.id);
         } catch (error) {
@@ -354,11 +419,15 @@ class FuelCardManager {
                 console.warn('Firebase לא זמין, מדלג על מחיקה');
                 return;
             }
-            
-            if (!cardId) {
-                throw new Error('cardId חסר');
+
+            if (window.FuelCardsService && window.FuelCardsService.deleteCard) {
+                await window.FuelCardsService.deleteCard(cardId);
+                console.log('כרטיס נמחק מ-Firebase:', cardId);
+                return;
             }
-            
+
+            // Fallback (למקרה ש-service לא נטען)
+            if (!cardId) throw new Error('cardId חסר');
             const cardRef = window.firebaseDoc(window.db, 'fuelCards', cardId);
             await window.firebaseDeleteDoc(cardRef);
             console.log('כרטיס נמחק מ-Firebase:', cardId);
@@ -376,15 +445,20 @@ class FuelCardManager {
                 console.warn('Firebase לא זמין, מדלג על מחיקה');
                 return;
             }
-            
+
+            if (window.FuelCardsService && window.FuelCardsService.deleteAllFuelCards) {
+                await window.FuelCardsService.deleteAllFuelCards();
+                console.log('כל הכרטיסים נמחקו מ-Firebase');
+                return;
+            }
+
+            // Fallback (למקרה ש-service לא נטען)
             const querySnapshot = await window.firebaseGetDocs(
                 window.firebaseCollection(window.db, 'fuelCards')
             );
-            
-            const deletePromises = querySnapshot.docs.map(doc => 
+            const deletePromises = querySnapshot.docs.map(doc =>
                 window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
             );
-            
             await Promise.all(deletePromises);
             console.log('כל הכרטיסים נמחקו מ-Firebase');
         } catch (error) {
@@ -404,20 +478,27 @@ class FuelCardManager {
                 console.warn('Firebase לא זמין');
                 return;
             }
-            
+
+            if (window.FuelCardsService && window.FuelCardsService.saveDataToFirebase) {
+                await window.FuelCardsService.saveDataToFirebase(this.fuelCards);
+                console.log('נתונים נשמרו ל-Firebase בהצלחה (שיטה לא יעילה)');
+                return;
+            }
+
+            // Fallback (למקרה ש-service לא נטען)
             // נמחק את כל המסמכים הקיימים
             const querySnapshot = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'fuelCards'));
-            const deletePromises = querySnapshot.docs.map(doc => 
+            const deletePromises = querySnapshot.docs.map(doc =>
                 window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id))
             );
             await Promise.all(deletePromises);
-            
+
             // נוסיף את כל הכרטיסים מחדש
-            const addPromises = this.fuelCards.map(card => 
+            const addPromises = this.fuelCards.map(card =>
                 window.firebaseAddDoc(window.firebaseCollection(window.db, 'fuelCards'), card)
             );
             await Promise.all(addPromises);
-            
+
             console.log('נתונים נשמרו ל-Firebase בהצלחה (שיטה לא יעילה)');
         } catch (error) {
             console.error('שגיאה בשמירת נתונים ל-Firebase:', error);
@@ -435,7 +516,9 @@ class FuelCardManager {
 
         // בדיקת תקינות סוג דלק
         if (command.fuelType) {
-            const allowedFuels = ['בנזין', 'סולר', 'דיזל', 'גז', 'חשמל', 'היברידי', 'אוריאה'];
+            const allowedFuels = (window.APP_CONSTANTS && window.APP_CONSTANTS.ALLOWED_FUELS)
+                ? window.APP_CONSTANTS.ALLOWED_FUELS
+                : ['בנזין', 'סולר', 'דיזל', 'גז', 'חשמל', 'היברידי', 'אוריאה'];
             const fuel = command.fuelType.toString().trim();
             if (!allowedFuels.includes(fuel)) {
                 this.showStatus('סוג דלק לא תקין - בחר: בנזין, סולר, דיזל, גז, חשמל, היברידי, אוריאה', 'error');
@@ -639,6 +722,10 @@ class FuelCardManager {
     // ערך מספרי של "remainingFuel" כפי שמוצג בטבלה
     // אם אין `remainingFuel` נשווה ל-`amount` (זה תואם ל-getCellValue בעמודת remainingFuel)
     getRemainingFuelValue(card) {
+        const fn = window.FuelCardsCellsUI && window.FuelCardsCellsUI.getRemainingFuelValue;
+        if (typeof fn === 'function') {
+            return fn(card);
+        }
         if (!card) return null;
         const value = (card.remainingFuel !== undefined && card.remainingFuel !== null)
             ? card.remainingFuel
@@ -651,6 +738,10 @@ class FuelCardManager {
 
     // מניעת XSS כאשר אנחנו מכניסים ערכים מ-DB לתוך HTML
     escapeHtml(value) {
+        const fn = window.FuelCardsCellsUI && window.FuelCardsCellsUI.escapeHtml;
+        if (typeof fn === 'function') {
+            return fn(value);
+        }
         return String(value)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -664,6 +755,10 @@ class FuelCardManager {
 
     // קבלת ערך תא
     getCellValue(card, column) {
+        const fn = window.FuelCardsCellsUI && window.FuelCardsCellsUI.getCellValue;
+        if (typeof fn === 'function') {
+            return fn(card, column);
+        }
         if (!card || !column) return '';
         
         // פונקציה עזר לניקוי ערך
@@ -713,6 +808,10 @@ class FuelCardManager {
 
     // קבלת טקסט שרשרת הכרטיס
     getCardChainText(cardChain) {
+        const fn = window.FuelCardsCellsUI && window.FuelCardsCellsUI.getCardChainText;
+        if (typeof fn === 'function') {
+            return fn(cardChain);
+        }
         if (!cardChain || cardChain.length === 0) return 'אין היסטוריה';
         
         // אנחנו מחזירים HTML (כולל `<br>`), לכן חייבים לברוח את הטקסט כדי לאפשר rendering בלי XSS.
@@ -726,6 +825,10 @@ class FuelCardManager {
 
     // קבלת טקסט סטטוס
     getStatusText(status) {
+        const fn = window.FuelCardsCellsUI && window.FuelCardsCellsUI.getStatusText;
+        if (typeof fn === 'function') {
+            return fn(status);
+        }
         if (status === undefined || status === null) {
             return '';
         }
@@ -741,6 +844,24 @@ class FuelCardManager {
     renderTable() {
         const tbody = document.getElementById('fuelCardsBody');
         tbody.innerHTML = '';
+
+        // Bind event delegation for table cell actions (only once per instance).
+        // Handles clicks on the "remainingFuel" cell without inline `onclick`.
+        if (!this._remainingFuelClickBound && tbody) {
+            tbody.addEventListener('click', (e) => {
+                const cell = e.target && e.target.closest
+                    ? e.target.closest('[data-action="showGadudCreditConfirmation"]')
+                    : null;
+                if (!cell) return;
+
+                const cardNumber = cell.getAttribute('data-card-number');
+                if (!cardNumber) return;
+
+                // Kept compatible with old behavior: vehicleNumber is empty string.
+                this.showGadudCreditConfirmation(cardNumber, '');
+            });
+            this._remainingFuelClickBound = true;
+        }
         
         // עדכון כותרות הטבלה
         this.updateTableHeaders();
@@ -768,73 +889,96 @@ class FuelCardManager {
         filteredCards.forEach(card => {
             const row = document.createElement('tr');
             
-            // הוספת מחלקת צבע לפי סטטוס
-            // ניפוק/עדכון גדודי - צהוב (אם יש נתונים גדודיים)
-            if (card.gadudName) {
-                row.classList.add('row-gadud');
-            }
-            // ניפוק רגיל - אדום
-            else if (card.status === 'new') {
-                row.classList.add('row-new');
-            }
-            // זיכוי רגיל - ירוק
-            else if (card.status === 'returned' || card.status === 'final_return') {
-                row.classList.add('row-returned');
-            }
-            
-            // יצירת תוכן השורה לפי העמודות
-            let rowContent = '';
-            let hasAnyContent = false; // בדיקה אם יש תוכן כלשהו בשורה
-            
-            this.tableColumns.forEach(column => {
-                // בדוק אם המשתמש יכול לראות את העמודה
-                if (this.canViewColumn(column)) {
-                    let cellValue = this.getCellValue(card, column);
-                    // ודא ש-cellValue לא undefined או null
-                    if (cellValue === undefined || cellValue === null) {
-                        cellValue = '';
-                    }
-                    // המר למחרוזת כדי למנוע בעיות
-                    cellValue = String(cellValue);
+            const renderer = window.FuelCardsTableRenderer;
+            if (renderer && typeof renderer.getRowClasses === 'function' && typeof renderer.buildRowContent === 'function') {
+                const classes = renderer.getRowClasses(card);
+                classes.forEach(cls => row.classList.add(cls));
 
-                    // `cardChain` מגיע עם `<br>` (והטקסט עצמו בורח בתוך getCardChainText),
-                    // לכן לא בורחים אותו שוב.
-                    const safeCellValue = column.id === 'cardChain'
-                        ? cellValue
-                        : this.escapeHtml(cellValue);
+                const built = renderer.buildRowContent({
+                    card,
+                    tableColumns: this.tableColumns,
+                    canViewColumn: (column) => this.canViewColumn(column),
+                    getCellValue: (c, column) => this.getCellValue(c, column),
+                    escapeHtml: (v) => this.escapeHtml(v)
+                });
 
-                    // בדוק אם יש תוכן בתא
-                    if (cellValue.trim() !== '') {
-                        hasAnyContent = true;
-                    }
-                    // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
-                    if (column.id === 'remainingFuel') {
-                        const cardNumberRaw = card ? card.cardNumber : null;
-                        const cardNumberNum = typeof cardNumberRaw === 'string'
-                            ? parseInt(cardNumberRaw, 10)
-                            : Number(cardNumberRaw);
-                        const safeCardNumber = Number.isFinite(cardNumberNum) ? String(cardNumberNum) : '';
-
-                        const isClickable = !!card.gadudName && safeCardNumber !== ''; // רק אם יש נתונים גדודיים + מספר תקין
-                        const clickableClass = isClickable ? 'clickable-remaining-fuel' : '';
-                        const cursorStyle = isClickable ? 'cursor: pointer;' : '';
-                        const title = isClickable ? 'לחץ לזיכוי גדודי (איפוס ל-0)' : '';
-                        rowContent += `<td class="${clickableClass}" style="${cursorStyle}" title="${title}" ${isClickable ? `onclick="fuelCardManager.showGadudCreditConfirmation('${safeCardNumber}', '')"` : ''}>${safeCellValue}</td>`;
-                    } else {
-                        rowContent += `<td>${safeCellValue}</td>`;
-                    }
+                if (built && built.hasAnyContent) {
+                    row.innerHTML = built.rowContent;
+                    tbody.appendChild(row);
                 }
-            });
-            
-            // הצג את השורה רק אם יש תוכן כלשהו
-            if (hasAnyContent) {
-                row.innerHTML = rowContent;
-                tbody.appendChild(row);
+            } else {
+                // Fallback - original rendering logic (keeps behavior stable if renderer failed to load)
+                // הוספת מחלקת צבע לפי סטטוס
+                // ניפוק/עדכון גדודי - צהוב (אם יש נתונים גדודיים)
+                if (card.gadudName) {
+                    row.classList.add('row-gadud');
+                }
+                // ניפוק רגיל - אדום
+                else if (card.status === 'new') {
+                    row.classList.add('row-new');
+                }
+                // זיכוי רגיל - ירוק
+                else if (card.status === 'returned' || card.status === 'final_return') {
+                    row.classList.add('row-returned');
+                }
+                
+                // יצירת תוכן השורה לפי העמודות
+                let rowContent = '';
+                let hasAnyContent = false; // בדיקה אם יש תוכן כלשהו בשורה
+                
+                this.tableColumns.forEach(column => {
+                    // בדוק אם המשתמש יכול לראות את העמודה
+                    if (this.canViewColumn(column)) {
+                        let cellValue = this.getCellValue(card, column);
+                        // ודא ש-cellValue לא undefined או null
+                        if (cellValue === undefined || cellValue === null) {
+                            cellValue = '';
+                        }
+                        // המר למחרוזת כדי למנוע בעיות
+                        cellValue = String(cellValue);
+
+                        // `cardChain` מגיע עם `<br>` (והטקסט עצמו בורח בתוך getCardChainText),
+                        // לכן לא בורחים אותו שוב.
+                        const safeCellValue = column.id === 'cardChain'
+                            ? cellValue
+                            : this.escapeHtml(cellValue);
+
+                        // בדוק אם יש תוכן בתא
+                        if (cellValue.trim() !== '') {
+                            hasAnyContent = true;
+                        }
+                        // אם זו עמודת כמות דלק שנשאר, הוסף אפשרות לחיצה לזיכוי גדודי
+                        if (column.id === 'remainingFuel') {
+                            const cardNumberRaw = card ? card.cardNumber : null;
+                            const cardNumberNum = typeof cardNumberRaw === 'string'
+                                ? parseInt(cardNumberRaw, 10)
+                                : Number(cardNumberRaw);
+                            const safeCardNumber = Number.isFinite(cardNumberNum) ? String(cardNumberNum) : '';
+
+                            const isClickable = !!card.gadudName && safeCardNumber !== ''; // רק אם יש נתונים גדודיים + מספר תקין
+                            const clickableClass = isClickable ? 'clickable-remaining-fuel' : '';
+                            const cursorStyle = isClickable ? 'cursor: pointer;' : '';
+                            const title = isClickable ? 'לחץ לזיכוי גדודי (איפוס ל-0)' : '';
+                            const actionAttrs = isClickable
+                                ? `data-action="showGadudCreditConfirmation" data-card-number="${safeCardNumber}"`
+                                : '';
+                            rowContent += `<td class="${clickableClass}" style="${cursorStyle}" title="${title}" ${actionAttrs}>${safeCellValue}</td>`;
+                        } else {
+                            rowContent += `<td>${safeCellValue}</td>`;
+                        }
+                    }
+                });
+                
+                // הצג את השורה רק אם יש תוכן כלשהו
+                if (hasAnyContent) {
+                    row.innerHTML = rowContent;
+                    tbody.appendChild(row);
+                }
             }
         });
         
-        // עדכן את פקדי המיון והסינון אחרי רינדור הטבלה
-        if (this.currentUser && this.currentUser.isAdmin) {
+        // עדכן את פקדי המיון והסינון אחרי רינדור הטבלה (לכל משתמש מחובר)
+        if (this.currentUser) {
             this.updateAdminSortingControls();
         }
     }
@@ -851,94 +995,119 @@ class FuelCardManager {
     
     // סינון וחיפוש כרטיסים
     getFilteredAndSearchedCards() {
-        let cards = this.getFilteredCards();
-        
-        // סינון כרטיסים ריקים - הסר כרטיסים ללא נתונים בסיסיים
-        cards = cards.filter(card => this.isValidCard(card));
-        
-        // סינון לפי סטטוס (עדכון לתמיכה בכל האפשרויות)
+        const cards = this.getFilteredCards();
+
         const statusFilter = document.getElementById('statusFilter');
+        const gadudFilter = document.getElementById('gadudFilter');
+        const fuelTypeFilter = document.getElementById('fuelTypeFilter');
+        const yearFilter = document.getElementById('yearFilter');
+        const monthFilter = document.getElementById('monthFilter');
+        const searchInput = document.getElementById('searchInput');
+        const sortBy = document.getElementById('sortBy');
+
+        const isAdmin = !!(this.currentUser && this.currentUser.isAdmin);
+        const statusFilterValue = statusFilter ? statusFilter.value : 'all';
+        const gadudFilterValue = gadudFilter ? gadudFilter.value : 'all';
+        const fuelTypeFilterValue = fuelTypeFilter ? fuelTypeFilter.value : 'all';
+        const yearFilterValue = yearFilter ? yearFilter.value : 'all';
+        const monthFilterValue = monthFilter ? monthFilter.value : 'all';
+        const searchTerm = (searchInput && searchInput.value && searchInput.value.trim())
+            ? searchInput.value.trim().toLowerCase()
+            : '';
+        const sortByValue = sortBy ? sortBy.value : 'none';
+
+        // Delegation to selection module (safer + more modular).
+        if (window.CardsSelectors && window.CardsSelectors.filterAndSearchCards) {
+            return window.CardsSelectors.filterAndSearchCards(
+                cards,
+                {
+                    isAdmin,
+                    statusFilterValue,
+                    gadudFilterValue,
+                    fuelTypeFilterValue,
+                    yearFilterValue,
+                    monthFilterValue,
+                    searchTerm,
+                    sortByValue
+                },
+                {
+                    isValidCard: (card) => this.isValidCard(card),
+                    getRemainingFuelValue: (card) => this.getRemainingFuelValue(card),
+                    parseDateString: (dateStr) => this.parseDateString(dateStr),
+                    compareDates: (a, b) => this.compareDates(a, b)
+                }
+            );
+        }
+
+        // Fallback (in case cardsSelectors.js didn't load)
+        let filtered = cards.filter(card => this.isValidCard(card));
+
         if (statusFilter && statusFilter.value !== 'all') {
             if (statusFilter.value === 'returned') {
-                // הוחזרו / זיכוי סופי
-                cards = cards.filter(card => card.status === 'returned' || card.status === 'final_return');
+                filtered = filtered.filter(card => card.status === 'returned' || card.status === 'final_return');
             } else if (statusFilter.value === 'not_returned') {
-                // לא הוחזרו (כל מה שלא סטטוס החזרה/סופי)
-                cards = cards.filter(card => card.status !== 'returned' && card.status !== 'final_return');
+                filtered = filtered.filter(card => card.status !== 'returned' && card.status !== 'final_return');
             } else if (statusFilter.value === 'gadud_credited') {
-                // זוכו גדודית: לפי מה שמוצג בעמודת remainingFuel בטבלה (=0)
-                cards = cards.filter(card => {
+                filtered = filtered.filter(card => {
                     const remaining = this.getRemainingFuelValue(card);
                     return remaining !== null && remaining === 0;
                 });
             } else if (statusFilter.value === 'gadud_not_credited') {
-                // לא זוכו גדודית (המשלים): לפי עמודת remainingFuel בטבלה != 0
-                cards = cards.filter(card => {
+                filtered = filtered.filter(card => {
                     const remaining = this.getRemainingFuelValue(card);
                     return remaining !== null && remaining !== 0;
                 });
             }
         }
-        
-        // סינון לפי גדוד (רק למנהל)
-        const gadudFilter = document.getElementById('gadudFilter');
-        if (gadudFilter && this.currentUser && this.currentUser.isAdmin && gadudFilter.value !== 'all') {
+
+        if (gadudFilter && gadudFilter.value !== 'all') {
             if (gadudFilter.value === 'no_gadud') {
-                cards = cards.filter(card => !card.gadudNumber || card.gadudNumber === '');
+                filtered = filtered.filter(card => !card.gadudNumber || card.gadudNumber === '');
             } else {
-                cards = cards.filter(card => card.gadudNumber === gadudFilter.value);
+                filtered = filtered.filter(card => card.gadudNumber === gadudFilter.value);
             }
         }
 
-        // סינון לפי סוג דלק
-        const fuelTypeFilter = document.getElementById('fuelTypeFilter');
         if (fuelTypeFilter && fuelTypeFilter.value !== 'all') {
             const wantedFuel = fuelTypeFilter.value;
-            cards = cards.filter(card => {
+            filtered = filtered.filter(card => {
                 const fuel = (card.fuelType || '').toString().trim();
                 return fuel === wantedFuel;
             });
         }
 
-        // סינון לפי שנה/חודש (תאריך ניפוק/תאריך כרטיס)
-        const yearFilter = document.getElementById('yearFilter');
-        const monthFilter = document.getElementById('monthFilter');
         const filterByYear = yearFilter && yearFilter.value !== 'all';
         const filterByMonth = monthFilter && monthFilter.value !== 'all';
         if (filterByYear || filterByMonth) {
-            cards = cards.filter(card => {
+            filtered = filtered.filter(card => {
                 const dateStr = card.issueDate || card.date || card.creditDate;
                 const d = this.parseDateString(dateStr);
                 if (!d) return false;
                 const year = d.getFullYear().toString();
-                const month = (d.getMonth() + 1).toString(); // 1-12
+                const month = (d.getMonth() + 1).toString();
                 if (filterByYear && yearFilter.value !== year) return false;
                 if (filterByMonth && monthFilter.value !== month) return false;
                 return true;
             });
         }
-        
-        // חיפוש
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput && searchInput.value.trim()) {
-            const searchTerm = searchInput.value.trim().toLowerCase();
-            cards = cards.filter(card => {
+
+        if (searchInput && searchInput.value && searchInput.value.trim()) {
+            const searchTermFallback = searchInput.value.trim().toLowerCase();
+            filtered = filtered.filter(card => {
                 const cardNumber = (card.cardNumber || '').toString().toLowerCase();
                 const name = (card.name || '').toLowerCase();
                 const phone = (card.phone || '').toLowerCase();
-                return cardNumber.includes(searchTerm) || 
-                       name.includes(searchTerm) || 
-                       phone.includes(searchTerm);
+                return cardNumber.includes(searchTermFallback) ||
+                    name.includes(searchTermFallback) ||
+                    phone.includes(searchTermFallback);
             });
         }
-        
-        // מיון (רק למנהל)
-        const sortBy = document.getElementById('sortBy');
-        if (sortBy && this.currentUser && this.currentUser.isAdmin && sortBy.value !== 'none') {
-            cards = this.sortCards(cards, sortBy.value);
+
+        if (sortBy && sortBy.value !== 'none') {
+            filtered = this.sortCards(filtered, sortBy.value);
         }
-        
-        return cards;
+
+        return filtered;
     }
     
     // פונקציה למיון כרטיסים
@@ -1083,12 +1252,22 @@ class FuelCardManager {
     
     // עדכון תצוגת מספר כרטיסים מסוננים
     updateFilteredCardsCount(filteredCards) {
+        const fn = window.FuelCardsTableUI && window.FuelCardsTableUI.updateFilteredCardsCount;
+        if (typeof fn === 'function') {
+            return fn({
+                filteredCards,
+                totalCards: this.fuelCards.length,
+                isAdmin: !!(this.currentUser && this.currentUser.isAdmin)
+            });
+        }
+
+        // Fallback (למקרה שה-UI module לא נטען)
         const countElement = document.getElementById('filteredCardsCount');
         if (!countElement) return;
-        
+
         const totalCards = this.fuelCards.length;
         const filteredCount = filteredCards.length;
-        
+
         if (this.currentUser && this.currentUser.isAdmin) {
             if (filteredCount === totalCards) {
                 countElement.textContent = `סה"כ כרטיסים: ${totalCards}`;
@@ -1102,16 +1281,22 @@ class FuelCardManager {
     
     // עדכון סטטיסטיקות
     updateStats(cards) {
+        const fn = window.FuelCardsTableUI && window.FuelCardsTableUI.updateStats;
+        if (typeof fn === 'function') {
+            return fn({ cards });
+        }
+
+        // Fallback
         const total = cards.length;
         const active = cards.filter(c => c.status === 'active' || c.status === 'new' || c.status === 'updated').length;
         const newCards = cards.filter(c => c.status === 'new').length;
         const returned = cards.filter(c => c.status === 'returned' || c.status === 'final_return').length;
-        
+
         const statTotal = document.getElementById('statTotal');
         const statActive = document.getElementById('statActive');
         const statNew = document.getElementById('statNew');
         const statReturned = document.getElementById('statReturned');
-        
+
         if (statTotal) statTotal.textContent = total;
         if (statActive) statActive.textContent = active;
         if (statNew) statNew.textContent = newCards;
@@ -1120,11 +1305,20 @@ class FuelCardManager {
 
     // עדכון כותרות הטבלה
     updateTableHeaders() {
+        const fn = window.FuelCardsTableUI && window.FuelCardsTableUI.updateTableHeaders;
+        if (typeof fn === 'function') {
+            return fn({
+                tableColumns: this.tableColumns,
+                canViewColumn: (column) => this.canViewColumn(column)
+            });
+        }
+
+        // Fallback
         const thead = document.querySelector('#fuelCardsTable thead tr');
         if (!thead) return;
-        
+
         thead.innerHTML = '';
-        
+
         this.tableColumns.forEach(column => {
             if (this.canViewColumn(column)) {
                 const th = document.createElement('th');
@@ -1303,6 +1497,51 @@ class FuelCardManager {
                 statusText.textContent = 'כבוי';
                 controls.classList.remove('bulk-issue--active');
             }
+        }
+    }
+
+    // אחרי initFirebaseAuth: נטען נתונים רק אם יש לנו custom claims (admin/gadudNumber).
+    // אחרת נשאיר את מסך ההתחברות פעיל (כדי לא לקבל permission-denied).
+    async afterAuthInit() {
+        const hasClaims = await this.syncUserFromTokenClaims();
+        if (!hasClaims) {
+            this.currentUser = null;
+            this.showLoginForm();
+            return;
+        }
+
+        this.showMainInterface();
+        // טעינת נתונים אחרי שה-Rules יאפשרו קריאה לפי claims
+        setTimeout(() => this.loadDataFromFirebase(), 100);
+    }
+
+    // מסנכרן את ה-UI (localStorage.currentUser) לפי custom claims מה-Auth token
+    async syncUserFromTokenClaims() {
+        try {
+            if (!window.auth || !window.auth.currentUser) return false;
+
+            const tokenResult = await window.auth.currentUser.getIdTokenResult(true);
+            const claims = tokenResult && tokenResult.claims ? tokenResult.claims : {};
+
+            const isAdmin = claims.admin === true;
+            const gadudNumber = isAdmin ? 'admin' : claims.gadudNumber;
+
+            const isValid = isAdmin || (typeof gadudNumber === 'string' && gadudNumber.trim() !== '');
+            if (!isValid) return false;
+
+            const existingName = (this.currentUser && this.currentUser.name) ? this.currentUser.name : gadudNumber;
+            const user = {
+                name: existingName,
+                gadud: gadudNumber,
+                isAdmin: isAdmin,
+                loginTime: new Date().toLocaleString('he-IL')
+            };
+
+            this.setCurrentUser(user);
+            return true;
+        } catch (e) {
+            console.error('syncUserFromTokenClaims failed:', e);
+            return false;
         }
     }
 
@@ -1577,80 +1816,41 @@ class FuelCardManager {
         // החזר תצוגה ל-backdrop (בפתיחה שנייה אחרי סגירה הוא נשאר display:none)
         const backdrop = confirmationDialog.querySelector('div[style*="position: fixed"]');
         if (backdrop) backdrop.style.display = 'flex';
+
+        this.bindGadudCreditConfirmationDialogEvents(confirmationDialog);
+    }
+
+    bindGadudCreditConfirmationDialogEvents(dialog) {
+        if (!dialog) return;
+        if (dialog.dataset.actionsBound === 'true') return;
+
+        const confirmBtn = dialog.querySelector('[data-dialog-action="confirmGadudCredit"]');
+        const cancelBtn = dialog.querySelector('[data-dialog-action="cancelGadudCredit"]');
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.confirmGadudCredit();
+            });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.cancelGadudCredit();
+            });
+        }
+
+        dialog.dataset.actionsBound = 'true';
     }
 
     createGadudCreditConfirmationDialog() {
+        const factory = window.FuelCardDialogs && window.FuelCardDialogs.createGadudCreditConfirmationDialog;
+        if (factory) return factory();
+
+        // Fallback למניעת קריסה אם ה-script לא נטען
         const dialog = document.createElement('div');
         dialog.id = 'gadudCreditConfirmationDialog';
-        dialog.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.7);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            ">
-                <div style="
-                    background: white;
-                    padding: 40px;
-                    border-radius: 15px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                    text-align: center;
-                    min-width: 500px;
-                    max-width: 600px;
-                ">
-                    <h2 style="color: #2c3e50; margin-bottom: 30px; font-size: 1.5em;">אישור זיכוי גדודי</h2>
-                    <div style="
-                        background: #fff3cd;
-                        border: 2px solid #ffc107;
-                        border-radius: 10px;
-                        padding: 25px;
-                        margin-bottom: 30px;
-                        text-align: right;
-                        direction: rtl;
-                    ">
-                        <p style="
-                            color: #856404;
-                            font-size: 1.1em;
-                            line-height: 1.8;
-                            margin: 0;
-                            font-weight: 500;
-                        ">
-                            אני מאשר כי בדקתי ווידאתי שאכן הכרטיס נוצל עד תום והוא ריק לגמרי מדלק (או באמצעות האתר הייעודי לכך או באמצעות קבלות).
-                        </p>
-                    </div>
-                    <div style="display: flex; gap: 15px; justify-content: center;">
-                        <button onclick="fuelCardManager.confirmGadudCredit()" style="
-                            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            font-weight: 600;
-                            min-width: 120px;
-                        ">מאשר</button>
-                        <button onclick="fuelCardManager.cancelGadudCredit()" style="
-                            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            font-weight: 600;
-                            min-width: 120px;
-                        ">לא מאשר</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        dialog.innerHTML = '<div style="padding:20px; direction: rtl;">לא ניתן לטעון את חלונית הזיכוי.</div>';
         return dialog;
     }
 
@@ -1724,7 +1924,8 @@ class FuelCardManager {
     }
 
     checkLogin() {
-        if (!this.currentUser) {
+        // חייב להיות גם currentUser מקומי וגם משתמש מחובר בפועל
+        if (!this.currentUser || !window.auth || !window.auth.currentUser) {
             this.showLoginForm();
         } else {
             this.showMainInterface();
@@ -1780,81 +1981,41 @@ class FuelCardManager {
             this.showLoginStatus('יש למלא את כל השדות', 'error');
             return;
         }
-        
-        // בדיקת משתמשים מורשים - סיסמאות ייחודיות לכל גדוד
-        let isAuthorized = false;
-        let isAdmin = false;
-        let validatedGadud = gadud;
-        
-        // הגדרת סיסמאות ייחודיות לכל גדוד
-        const gadudPasswords = {
-            '650': '9526',        // מפקדת אגד 650 - נשאר כפי שנדרש
-            '703': 'Zt7$Qp!9',    // גדוד 703
-            '651': 'Lm3@Rg#5',    // גדוד 651
-            '791': 'Vy8%Tc^2',    // יחידה 791
-            '652': 'Hd4&Ns*7',    // גדוד 652
-            '638': 'Pf1)Wb=6',    // גדוד 638
-            '653': 'Qk5+Xe?8',    // גדוד 653
-            '674': 'Jr9!Lu$4'     // גדוד 674
+
+        // אימות מאובטח באמצעות Firebase Auth Email/Password
+        // בטופס שלך: "loginName" משמש בפועל כסיסמה שהוזנה.
+        const password = name;
+        const adminEmail = 'admin@fuelcards-system.com';
+        const gadudEmails = {
+            '650': '650@fuelcards-system.com',
+            '703': '703@fuelcards-system.com',
+            '651': '651@fuelcards-system.com',
+            '791': '791@fuelcards-system.com',
+            '652': '652@fuelcards-system.com',
+            '638': '638@fuelcards-system.com',
+            '653': '653@fuelcards-system.com',
+            '674': '674@fuelcards-system.com'
         };
-        
-        // בדיקת סיסמה לפי הגדוד שנבחר
-        if (gadudPasswords[gadud] && name === gadudPasswords[gadud]) {
-            isAuthorized = true;
-            validatedGadud = gadud;
-        }
-        // משתמש מורשה: 9526 עם מנהל מערכת
-        else if (name === '9526' && (gadud === 'admin' || gadud === 'מנהל מערכת')) {
-            isAuthorized = true;
-            isAdmin = true;
-            validatedGadud = 'admin';
-        }
-        
-        if (!isAuthorized) {
+
+        const email = (gadud === 'admin' || gadud === 'מנהל מערכת') ? adminEmail : gadudEmails[gadud];
+        if (!email) {
             this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
             return;
         }
-        
-        // 🔒 התחברות ל-Firebase Authentication (רק אחרי שהסיסמה נכונה!)
+
         try {
-            if (!window.auth || !window.signInAnonymously) {
-                console.warn('⚠️ Firebase Authentication לא זמין - המשך ללא Authentication');
-                // נסה שוב אחרי שנייה
-                setTimeout(() => this.initFirebaseAuth(), 1000);
-            } else if (!window.auth.currentUser) {
-                // התחברות ל-Firebase Anonymous Authentication
-                console.log('🔄 מנסה להתחבר ל-Firebase Authentication...');
-                await window.signInAnonymously(window.auth);
-                console.log('✅ התחברות ל-Firebase Authentication הצליחה');
-            } else {
-                console.log('✅ משתמש כבר מחובר ל-Firebase Authentication');
+            if (!window.signInWithEmailAndPassword) {
+                this.showLoginStatus('שגיאה: Firebase Auth לא זמין', 'error');
+                return;
             }
+
+            await window.signInWithEmailAndPassword(window.auth, email, password);
+            // מאזין onAuthStateChanged ידאג ל-showMainInterface + טעינת נתונים
+            this.showStatus('התחברות הצליחה', 'success');
         } catch (error) {
-            console.error('❌ שגיאה בהתחברות ל-Firebase Authentication:', error);
-            // אם זו שגיאת permission, זה אומר ש-Anonymous Authentication לא מופעל
-            if (error.code === 'auth/operation-not-allowed') {
-                console.error('⚠️ Anonymous Authentication לא מופעל ב-Firebase Console!');
-                this.showStatus('שגיאה: Anonymous Authentication לא מופעל. אנא הפעל אותו ב-Firebase Console → Authentication → Sign-in method', 'error');
-            } else {
-                // נמשיך גם אם Authentication נכשל, אבל נזהיר
-                this.showStatus('אזהרה: בעיה בהתחברות לאבטחה. חלק מהפונקציות עלולות לא לעבוד.', 'warning');
-            }
+            console.error('❌ שגיאה בהתחברות:', error);
+            this.showLoginStatus('סיסמה סודית שגויה או גדוד לא מורשה', 'error');
         }
-        
-        const user = {
-            name: name,
-            gadud: validatedGadud,
-            isAdmin: isAdmin,
-            loginTime: new Date().toLocaleString('he-IL')
-        };
-        
-        this.setCurrentUser(user);
-        this.showMainInterface();
-        // עדכן את פקדי המיון והסינון מיד אחרי התחברות
-        setTimeout(() => {
-            this.updateAdminSortingControls();
-        }, 500);
-        this.showStatus(`ברוך הבא!`, 'success');
     }
 
     showLoginStatus(message, type) {
@@ -1906,21 +2067,14 @@ class FuelCardManager {
         this.renderTable();
     }
     
-    // עדכון פקדי מיון וסינון למנהל
+    // עדכון פקדי מיון וסינון לכל משתמש מחובר
     updateAdminSortingControls() {
         const adminSortingControls = document.getElementById('adminSortingControls');
         if (!adminSortingControls) {
             return;
         }
-        
-        // בדוק אם המשתמש הוא מנהל
-        const isAdmin = this.currentUser && this.currentUser.isAdmin;
-        
-        if (isAdmin) {
-            adminSortingControls.style.display = 'block';
-        } else {
-            adminSortingControls.style.display = 'none';
-        }
+
+        adminSortingControls.style.display = this.currentUser ? 'block' : 'none';
     }
 
     // עדכון נראות כפתורים לפי הרשאות
@@ -2550,71 +2704,52 @@ class FuelCardManager {
             passwordInput.value = '';
             passwordInput.focus();
         }
+
+        this.bindEditCardPasswordDialogEvents(passwordDialog);
+    }
+
+    bindEditCardPasswordDialogEvents(dialog) {
+        if (!dialog) return;
+        if (dialog.dataset.actionsBound === 'true') return;
+
+        const confirmBtn = dialog.querySelector('[data-dialog-action="verifyEditCardPassword"]');
+        const cancelBtn = dialog.querySelector('[data-dialog-action="cancelEditCardPassword"]');
+        const passwordInput = dialog.querySelector('#editCardPassword');
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.verifyEditCardPassword();
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.cancelEditCardPassword();
+            });
+        }
+
+        if (passwordInput) {
+            passwordInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.verifyEditCardPassword();
+                }
+            });
+        }
+
+        dialog.dataset.actionsBound = 'true';
     }
 
     // יצירת חלונית אימות סיסמה
     createEditCardPasswordDialog() {
+        const factory = window.FuelCardDialogs && window.FuelCardDialogs.createEditCardPasswordDialog;
+        if (factory) return factory();
+
         const dialog = document.createElement('div');
         dialog.id = 'editCardPasswordDialog';
-        dialog.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.7);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            ">
-                <div style="
-                    background: white;
-                    padding: 40px;
-                    border-radius: 15px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                    text-align: center;
-                    min-width: 400px;
-                    direction: rtl;
-                ">
-                    <h2 style="color: #2c3e50; margin-bottom: 30px;">אימות סיסמה לעריכה</h2>
-                    <div style="margin-bottom: 20px;">
-                        <input type="password" id="editCardPassword" placeholder="הכנס סיסמה" style="
-                            width: 100%;
-                            padding: 12px;
-                            border: 2px solid #ddd;
-                            border-radius: 8px;
-                            font-size: 16px;
-                            margin-bottom: 15px;
-                        " onkeypress="if(event.key === 'Enter') fuelCardManager.verifyEditCardPassword()">
-                    </div>
-                    <div style="display: flex; gap: 15px; justify-content: center;">
-                        <button onclick="fuelCardManager.verifyEditCardPassword()" style="
-                            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            font-weight: 600;
-                        ">אישור</button>
-                        <button onclick="fuelCardManager.cancelEditCardPassword()" style="
-                            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
-                            color: white;
-                            border: none;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            font-size: 16px;
-                            cursor: pointer;
-                            font-weight: 600;
-                        ">ביטול</button>
-                    </div>
-                    <div id="editCardPasswordStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
-                </div>
-            </div>
-        `;
+        dialog.innerHTML = '<div style="padding:20px; direction: rtl;">לא ניתן לטעון את חלון אימות הסיסמה.</div>';
         return dialog;
     }
 
@@ -2704,160 +2839,86 @@ class FuelCardManager {
         const backdrop = editForm.querySelector('div[style*="position: fixed"]');
         if (backdrop) backdrop.style.display = 'flex';
         if (container) container.style.display = 'none';
+
+        this.bindEditCardFormDialogEvents(editForm);
+    }
+
+    bindEditCardFormDialogEvents(dialog) {
+        if (!dialog) return;
+        if (dialog.dataset.actionsBound === 'true') return;
+
+        const searchInput = dialog.querySelector('#editCardSearchNumber');
+        const searchBtn = dialog.querySelector('[data-dialog-action="searchCardForEdit"]');
+        const submitBtn = dialog.querySelector('[data-dialog-action="submitEditCard"]');
+        const cancelBtn = dialog.querySelector('[data-dialog-action="cancelEditCard"]');
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.searchCardForEdit();
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.searchCardForEdit();
+                }
+            });
+        }
+
+        if (submitBtn) {
+            submitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.submitEditCard();
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.cancelEditCard();
+            });
+        }
+
+        // Bind fuel type selector inside the edit dialog (replaces inline onclick/oninput).
+        const fuelSelector = dialog.querySelector('[data-fuel-selector]');
+        if (fuelSelector && fuelSelector.dataset && fuelSelector.dataset.fuelSelector) {
+            const inputId = fuelSelector.dataset.fuelSelector;
+            const fuelButtons = fuelSelector.querySelectorAll('[data-fuel-value]');
+
+            fuelButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const value = btn.dataset ? btn.dataset.fuelValue : undefined;
+                    if (window.selectFuelType && typeof window.selectFuelType === 'function') {
+                        window.selectFuelType(inputId, value, btn);
+                    }
+                });
+            });
+
+            const customInput = dialog.querySelector(`#${inputId}`);
+            if (customInput) {
+                customInput.addEventListener('input', () => {
+                    if (window.handleCustomFuelInput && typeof window.handleCustomFuelInput === 'function') {
+                        window.handleCustomFuelInput(inputId);
+                    }
+                });
+            }
+        }
+
+        dialog.dataset.actionsBound = 'true';
     }
 
     // יצירת טופס עריכת כרטיס
     createEditCardFormDialog() {
+        const factory = window.FuelCardDialogs && window.FuelCardDialogs.createEditCardFormDialog;
+        if (factory) return factory();
+
         const dialog = document.createElement('div');
         dialog.id = 'editCardFormDialog';
-        dialog.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.7);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-                overflow-y: auto;
-                padding: 20px;
-            ">
-                <div style="
-                    background: white;
-                    padding: 40px;
-                    border-radius: 15px;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                    text-align: right;
-                    min-width: 500px;
-                    max-width: 800px;
-                    width: 100%;
-                    direction: rtl;
-                ">
-                    <h2 style="color: #2c3e50; margin-bottom: 30px; text-align: center;">עריכת כרטיס</h2>
-                    
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר כרטיס (לחיפוש):</label>
-                        <input type="number" id="editCardSearchNumber" placeholder="הכנס מספר כרטיס" style="
-                            width: 100%;
-                            padding: 12px;
-                            border: 2px solid #ddd;
-                            border-radius: 8px;
-                            font-size: 16px;
-                        " onkeypress="if(event.key === 'Enter') fuelCardManager.searchCardForEdit()">
-                        <button onclick="fuelCardManager.searchCardForEdit()" style="
-                            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-                            color: white;
-                            border: none;
-                            padding: 10px 20px;
-                            border-radius: 8px;
-                            font-size: 14px;
-                            cursor: pointer;
-                            margin-top: 10px;
-                            width: 100%;
-                        ">חפש כרטיס</button>
-                    </div>
-                    
-                    <div id="editCardFormFields" style="display: none;">
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר כרטיס:</label>
-                            <input type="number" id="editCardNumber" style="
-                                width: 100%;
-                                padding: 12px;
-                                border: 2px solid #ddd;
-                                border-radius: 8px;
-                                font-size: 16px;
-                            ">
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">שם מלא:</label>
-                            <input type="text" id="editName" placeholder="הכנס שם מלא" style="
-                                width: 100%;
-                                padding: 12px;
-                                border: 2px solid #ddd;
-                                border-radius: 8px;
-                                font-size: 16px;
-                            ">
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר טלפון:</label>
-                            <input type="tel" id="editPhone" placeholder="הכנס מספר טלפון" style="
-                                width: 100%;
-                                padding: 12px;
-                                border: 2px solid #ddd;
-                                border-radius: 8px;
-                                font-size: 16px;
-                            ">
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">סוג דלק:</label>
-                            <div class="fuel-type-selector" data-fuel-selector="editFuelType">
-                                <div class="fuel-type-buttons">
-                                    <button type="button" class="fuel-type-option" data-fuel-value="בנזין" onclick="selectFuelType('editFuelType', 'בנזין', this)">בנזין</button>
-                                    <button type="button" class="fuel-type-option" data-fuel-value="סולר" onclick="selectFuelType('editFuelType', 'סולר', this)">סולר</button>
-                                    <button type="button" class="fuel-type-option" data-fuel-value="אוריאה" onclick="selectFuelType('editFuelType', 'אוריאה', this)">אוריאה</button>
-                                    <button type="button" class="fuel-type-option" data-fuel-value="other" onclick="selectFuelType('editFuelType', 'other', this)">אחר</button>
-                                </div>
-                                <div class="fuel-type-custom">
-                                    <input type="text" id="editFuelType" placeholder="הקלד סוג דלק" oninput="handleCustomFuelInput('editFuelType')">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">מספר גדוד:</label>
-                            <select id="editGadudNumber" style="
-                                width: 100%;
-                                padding: 12px;
-                                border: 2px solid #ddd;
-                                border-radius: 8px;
-                                font-size: 16px;
-                            ">
-                                <option value="">בחר מספר גדוד</option>
-                                <option value="650">650</option>
-                                <option value="703">703</option>
-                                <option value="651">651</option>
-                                <option value="791">791</option>
-                                <option value="652">652</option>
-                                <option value="638">638</option>
-                                <option value="653">653</option>
-                                <option value="674">674</option>
-                            </select>
-                        </div>
-                        
-                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
-                            <button onclick="fuelCardManager.submitEditCard()" style="
-                                background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-                                color: white;
-                                border: none;
-                                padding: 15px 30px;
-                                border-radius: 25px;
-                                font-size: 16px;
-                                cursor: pointer;
-                                font-weight: 600;
-                            ">שמור שינויים</button>
-                            <button onclick="fuelCardManager.cancelEditCard()" style="
-                                background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
-                                color: white;
-                                border: none;
-                                padding: 15px 30px;
-                                border-radius: 25px;
-                                font-size: 16px;
-                                cursor: pointer;
-                                font-weight: 600;
-                            ">ביטול</button>
-                        </div>
-                    </div>
-                    
-                    <div id="editCardStatus" style="margin-top: 20px; padding: 10px; border-radius: 8px; display: none;"></div>
-                </div>
-            </div>
-        `;
+        dialog.innerHTML = '<div style="padding:20px; direction: rtl;">לא ניתן לטעון את טופס עריכת הכרטיס.</div>';
         return dialog;
     }
 
@@ -3263,153 +3324,6 @@ function clearReturnCardForm() {
         creditDateField.value = '';
     }
 }
-
-window.selectFuelType = function(inputId, value, button) {
-    try {
-        const selector = button ? button.closest('[data-fuel-selector]') : document.querySelector(`[data-fuel-selector="${inputId}"]`);
-        const input = document.getElementById(inputId);
-        if (!selector || !input) {
-            return;
-        }
-
-        const buttons = selector.querySelectorAll('[data-fuel-value]');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        if (button) {
-            button.classList.add('active');
-        } else {
-            const targetButton = selector.querySelector(`[data-fuel-value="${value}"]`);
-            if (targetButton) {
-                targetButton.classList.add('active');
-            }
-        }
-
-        const customWrapper = selector.querySelector('.fuel-type-custom');
-        if (value === 'other') {
-            if (customWrapper) {
-                customWrapper.classList.add('visible');
-                input.value = '';
-                input.focus();
-            }
-        } else {
-            if (customWrapper) {
-                customWrapper.classList.remove('visible');
-            }
-            input.value = value;
-        }
-    } catch (error) {
-        console.error('שגיאה בבחירת סוג דלק:', error);
-    }
-};
-
-window.handleCustomFuelInput = function(inputId) {
-    try {
-        const selector = document.querySelector(`[data-fuel-selector="${inputId}"]`);
-        if (!selector) {
-            return;
-        }
-        const buttons = selector.querySelectorAll('[data-fuel-value]');
-        const otherButton = selector.querySelector('[data-fuel-value="other"]');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        if (otherButton) {
-            otherButton.classList.add('active');
-        }
-    } catch (error) {
-        console.error('שגיאה בעדכון סוג דלק מותאם:', error);
-    }
-};
-
-window.resetFuelTypeSelector = function(inputId) {
-    try {
-        const selector = document.querySelector(`[data-fuel-selector="${inputId}"]`);
-        const input = document.getElementById(inputId);
-        if (!selector || !input) {
-            return;
-        }
-
-        selector.querySelectorAll('[data-fuel-value]').forEach(btn => btn.classList.remove('active'));
-        const customWrapper = selector.querySelector('.fuel-type-custom');
-        if (customWrapper) {
-            customWrapper.classList.remove('visible');
-        }
-        input.value = '';
-    } catch (error) {
-        console.error('שגיאה באיפוס בורר דלק:', error);
-    }
-};
-
-window.selectAmount = function(inputId, value, button) {
-    try {
-        const selector = button ? button.closest('[data-amount-selector]') : document.querySelector(`[data-amount-selector="${inputId}"]`);
-        const input = document.getElementById(inputId);
-        if (!selector || !input) {
-            return;
-        }
-
-        const buttons = selector.querySelectorAll('[data-amount-value]');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        if (button) {
-            button.classList.add('active');
-        } else {
-            const targetButton = selector.querySelector(`[data-amount-value="${value}"]`);
-            if (targetButton) {
-                targetButton.classList.add('active');
-            }
-        }
-
-        const customWrapper = selector.querySelector('.amount-custom');
-        if (value === 'other') {
-            if (customWrapper) {
-                customWrapper.classList.add('visible');
-                input.value = '';
-                input.focus();
-            }
-        } else {
-            if (customWrapper) {
-                customWrapper.classList.remove('visible');
-            }
-            input.value = value;
-        }
-    } catch (error) {
-        console.error('שגיאה בבחירת כמות דלק:', error);
-    }
-};
-
-window.handleCustomAmountInput = function(inputId) {
-    try {
-        const selector = document.querySelector(`[data-amount-selector="${inputId}"]`);
-        if (!selector) {
-            return;
-        }
-
-        const buttons = selector.querySelectorAll('[data-amount-value]');
-        const otherButton = selector.querySelector('[data-amount-value="other"]');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        if (otherButton) {
-            otherButton.classList.add('active');
-        }
-    } catch (error) {
-        console.error('שגיאה בעדכון כמות מותאמת:', error);
-    }
-};
-
-window.resetAmountSelector = function(inputId) {
-    try {
-        const selector = document.querySelector(`[data-amount-selector="${inputId}"]`);
-        const input = document.getElementById(inputId);
-        if (!selector || !input) {
-            return;
-        }
-
-        selector.querySelectorAll('[data-amount-value]').forEach(btn => btn.classList.remove('active'));
-        const customWrapper = selector.querySelector('.amount-custom');
-        if (customWrapper) {
-            customWrapper.classList.remove('visible');
-        }
-        input.value = '';
-    } catch (error) {
-        console.error('שגיאה באיפוס בורר כמות:', error);
-    }
-};
 
 function activateBulkIssue() {
     try {
