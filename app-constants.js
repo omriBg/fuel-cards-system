@@ -1,5 +1,4 @@
-// Centralized UI/config constants used by the frontend.
-// Loaded from index.html before `script-firebase.js`.
+
 window.APP_CONSTANTS = window.APP_CONSTANTS || {};
 
 window.APP_CONSTANTS.ALLOWED_FUELS = window.APP_CONSTANTS.ALLOWED_FUELS || [

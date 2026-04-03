@@ -1493,7 +1493,7 @@
             ">
                 <h2 style="color: #2d5016; margin-bottom: 25px; font-weight: 600; font-size: 1.5em;">התחברות למערכת</h2>
                 <div style="margin-bottom: 20px;">
-                    <input type="text" id="loginName" placeholder="סיסמה סודית" style="
+                    <input type="password" id="loginName" placeholder="סיסמה סודית" style="
                         width: 100%;
                         padding: 12px;
                         border: 1px solid #e0e0e0;
@@ -1550,7 +1550,7 @@
         // Firebase Configuration
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyDmO6XVUQmoNb-LrNP8q78qTPKrZReAJ9U",
@@ -1582,6 +1582,8 @@
         window.onAuthStateChanged = onAuthStateChanged;
         window.signOut = signOut;
         window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.EmailAuthProvider = EmailAuthProvider;
+        window.reauthenticateWithCredential = reauthenticateWithCredential;
         
         // ודא ש-Firebase מוכן לפני טעינת script-firebase.js
         console.log('Firebase initialized, loading script-firebase.js...');
@@ -1641,7 +1643,6 @@
                 await loadScript('fuelCardsDomainService.js');
                 await loadScript('batchOperationsManager.js');
                 await loadScript('fuelCardDialogs.js');
-                await loadScript('fuelCardAuth.js');
                 await loadScript('fuelCardEditFlow.js');
                 await loadScript('script-firebase.js');
             } catch (e) {

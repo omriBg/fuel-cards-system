@@ -1,5 +1,4 @@
 // Firebase Configuration
-// המפתחות שלך מ-Firebase Console
 
 const firebaseConfig = {
     apiKey: "AIzaSyDmO6XVUQmoNb-LrNP8q78qTPKrZReAJ9U",

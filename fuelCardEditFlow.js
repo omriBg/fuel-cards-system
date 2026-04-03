@@ -81,39 +81,58 @@
             return dialog;
         },
 
-        verifyEditCardPassword(manager) {
+        async verifyEditCardPassword(manager) {
             if (manager._verifyingEditPassword) return;
             manager._verifyingEditPassword = true;
 
-            const passwordInput = document.getElementById('editCardPassword');
-            const statusDiv = document.getElementById('editCardPasswordStatus');
-
-            if (!passwordInput) {
-                manager._verifyingEditPassword = false;
-                return;
-            }
-
-            const password = passwordInput.value.trim();
-            if (password !== 'omribg9526') {
-                if (statusDiv) {
-                    manager.setInlineStatus(statusDiv, 'סיסמה שגויה', 'error');
-                }
-                passwordInput.value = '';
-                passwordInput.focus();
-                manager._verifyingEditPassword = false;
-                return;
-            }
-
-            const passwordDialog = document.getElementById('editCardPasswordDialog');
-            if (passwordDialog) passwordDialog.style.display = 'none';
-
             try {
-                this.showEditCardFormDialog(manager);
-            } catch (err) {
-                console.error('שגיאה בפתיחת טופס עריכה:', err);
-                const container = getContainer();
-                if (container) container.style.display = 'block';
-                manager.showStatus('שגיאה בפתיחת טופס עריכה. נסה לרענן את הדף.', 'error');
+                const passwordInput = document.getElementById('editCardPassword');
+                const statusDiv = document.getElementById('editCardPasswordStatus');
+
+                if (!passwordInput) {
+                    return;
+                }
+
+                const password = passwordInput.value.trim();
+                const userEmail = manager.currentUser && manager.currentUser.name ? String(manager.currentUser.name) : '';
+                if (!manager.currentUser || !manager.currentUser.isAdmin) {
+                    if (statusDiv) {
+                        manager.setInlineStatus(statusDiv, 'אין לך הרשאה לערוך כרטיסים', 'error');
+                    }
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                    return;
+                }
+
+                try {
+                    if (!window.reauthenticateWithCredential || !window.EmailAuthProvider || !window.auth || !window.auth.currentUser) {
+                        throw new Error('Firebase Auth לא זמין');
+                    }
+
+                    // אימות מול Firebase Auth (reauth) במקום סיסמה קבועה בקוד.
+                    const credential = window.EmailAuthProvider.credential(userEmail, password);
+                    await window.reauthenticateWithCredential(window.auth.currentUser, credential);
+                } catch (error) {
+                    console.error('שגיאה באימות סיסמה לעריכת כרטיס:', error);
+                    if (statusDiv) {
+                        manager.setInlineStatus(statusDiv, 'סיסמה שגויה', 'error');
+                    }
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                    return;
+                }
+
+                const passwordDialog = document.getElementById('editCardPasswordDialog');
+                if (passwordDialog) passwordDialog.style.display = 'none';
+
+                try {
+                    this.showEditCardFormDialog(manager);
+                } catch (err) {
+                    console.error('שגיאה בפתיחת טופס עריכה:', err);
+                    const container = getContainer();
+                    if (container) container.style.display = 'block';
+                    manager.showStatus('שגיאה בפתיחת טופס עריכה. נסה לרענן את הדף.', 'error');
+                }
             } finally {
                 manager._verifyingEditPassword = false;
             }

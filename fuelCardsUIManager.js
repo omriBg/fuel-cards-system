@@ -176,7 +176,6 @@ class FuelCardsUIManager {
         if (userInfoDiv) userInfoDiv.style.display = 'block';
         this.updateAdminSortingControls();
         this.updateButtonVisibility();
-        this.controller.updateBulkIssueUI();
         this.renderTable();
     }
 

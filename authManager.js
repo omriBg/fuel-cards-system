@@ -133,7 +133,6 @@ class AuthManager {
 
         localStorage.removeItem('currentUser');
         this.controller.currentUser = null;
-        this.controller.clearBulkIssueState();
         this.controller.uiManager.showLoginForm();
     }
 }
