@@ -46,7 +46,6 @@
         return cards;
     };
 
-    // Adds a new card document and updates the passed object with `card.id`.
     window.FuelCardsService.addCard = async function (card) {
         assertFirebaseReady();
         if (!card) throw new Error('card missing');
@@ -92,24 +91,7 @@
         await window.firebaseDeleteDoc(cardRef);
     };
 
-    window.FuelCardsService.deleteAllFuelCards = async function () {
-        assertFirebaseReady();
-        const querySnapshot = await window.firebaseGetDocs(getFuelCardsCollection());
-        const deletePromises = querySnapshot.docs.map((doc) => window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id)));
-        await Promise.all(deletePromises);
-    };
-
-    // Deprecated: backfill all cards by deleting then inserting.
-    window.FuelCardsService.saveDataToFirebase = async function (cards) {
-        assertFirebaseReady();
-        if (!Array.isArray(cards)) throw new Error('cards must be an array');
-
-        const querySnapshot = await window.firebaseGetDocs(getFuelCardsCollection());
-        const deletePromises = querySnapshot.docs.map((doc) => window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'fuelCards', doc.id)));
-        await Promise.all(deletePromises);
-
-        const addPromises = cards.map((card) => window.firebaseAddDoc(getFuelCardsCollection(), card));
-        await Promise.all(addPromises);
-    };
+    
+   
 })();
 

@@ -1,5 +1,4 @@
-// UI-only helpers for fuel type / amount selector buttons.
-// These functions are referenced from `index.html` via inline onclick handlers.
+
 
 window.selectFuelType = function (inputId, value, button) {
     try {

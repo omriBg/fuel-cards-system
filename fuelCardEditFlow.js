@@ -109,7 +109,6 @@
                         throw new Error('Firebase Auth לא זמין');
                     }
 
-                    // אימות מול Firebase Auth (reauth) במקום סיסמה קבועה בקוד.
                     const credential = window.EmailAuthProvider.credential(userEmail, password);
                     await window.reauthenticateWithCredential(window.auth.currentUser, credential);
                 } catch (error) {

@@ -21,7 +21,7 @@ class AuthManager {
         }
     }
 
-    async waitForFirebaseAndInit() {
+    async waitForFirebaseAndInit() { 
         let attempts = 0;
         const maxAttempts = 20;
         while (attempts < maxAttempts) {
@@ -36,10 +36,10 @@ class AuthManager {
     }
 
     setupAuthStateListener() {
-        if (this._authStateListenerBound) return;
+        if (this._authStateListenerBound) return;     //Memory Leaks
         this._authStateListenerBound = true;
 
-        window.onAuthStateChanged(window.auth, async (user) => {
+        window.onAuthStateChanged(window.auth, async (user) => {          //Observer Pattern
             if (!user) {
                 localStorage.removeItem('currentUser');
                 this.controller.currentUser = null;
@@ -49,7 +49,7 @@ class AuthManager {
 
             const email = user.email || '';
             const adminEmail = 'admin@fuelcards-system.com';
-            const isAdmin = email === adminEmail;
+            const isAdmin = email === adminEmail;  
             const gadudMap = {
                 '650@fuelcards-system.com': '650',
                 '703@fuelcards-system.com': '703',

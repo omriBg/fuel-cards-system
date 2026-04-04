@@ -2,17 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /fuelCards/{cardId} {
-      // ==== Authz model (no Functions) ====
-      // ההרשאות נשענות על Firebase Auth Email של המשתמש:
-      // - Admin email: admin@fuelcards-system.com
-      // - User emails: <gadud>@fuelcards-system.com
+      
 
       function isAdmin() {
         return request.auth != null && request.auth.token.email == 'admin@fuelcards-system.com';
       }
 
       function gadudFromEmail() {
-        // מחזיר מחרוזת (או '' אם אין התאמה)
         return request.auth != null &&
           request.auth.token.email is string
           ?
@@ -43,7 +39,6 @@ service cloud.firestore {
       }
 
       function isMyGadudForUpdate() {
-        // משתמש רגיל לא יכול להעביר כרטיס לגדוד אחר
         return request.auth != null
           && gadudFromEmail() != ''
           && resource.data.gadudNumber is string
@@ -73,16 +68,14 @@ service cloud.firestore {
       // ==== Permissions ====
       allow read: if isAdmin() || isMyGadudForRead();
 
-      // כדי להשאיר התנהגות כמו ה-UI: רק מנהל מנפק כרטיסים (Create)
       allow create: if isAdmin() && validateFuelCardData(request.resource.data);
 
       allow update: if isAdmin() || (isMyGadudForUpdate() && validateFuelCardData(request.resource.data));
 
-      // מחיקה - רק admin
       allow delete: if isAdmin();
     }
 
-    // Collection אחרות - חסום לחלוטין
+    // Collection 
     match /{document=**} {
       allow read, write: if false;
     }
