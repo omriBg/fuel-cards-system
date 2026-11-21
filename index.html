@@ -987,15 +987,30 @@
             margin: 8px 0 16px;
         }
 
-        .receipt-switch {
+        .receipt-filters {
             display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+            margin-bottom: 18px;
         }
 
-        .receipt-switch .view-tab {
-            border-bottom: 1px solid #d5d5d5;
+        .receipt-filters select,
+        .receipt-filters input[type="date"] {
+            display: block;
+            min-width: 180px;
+            margin-top: 4px;
+            padding: 8px;
+            border: 1px solid #ccc;
             border-radius: 3px;
+            font-size: 1em;
+            background: white;
+        }
+
+        .receipt-section-title {
+            margin: 18px 0 10px;
+            color: #2d5016;
+            font-size: 1.15em;
         }
 
         .receipt-empty {

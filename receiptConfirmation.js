@@ -65,12 +65,15 @@
         constructor(controller) {
             this.controller = controller;
             this.confirmations = new Map();
-            this.mode = 'pending';
+            this.selectedGadud = '';
+            this.selectedDate = '';
             this.open = false;
             this.loaded = false;
             this.loading = false;
             this.loadError = '';
             this._bound = false;
+            this._openedAt = 0;
+            this._loadPromise = null;
             this.bind();
         }
 
@@ -86,15 +89,15 @@
             const cardsTab = document.getElementById('cardsViewTab');
             const receiptTab = document.getElementById('receiptViewTab');
             if (cardsTab) cardsTab.addEventListener('click', () => this.showCardsView());
-            if (receiptTab) receiptTab.addEventListener('click', () => { this.showReceiptView(); });
+            if (receiptTab) receiptTab.addEventListener('click', () => this.onReceiptTabClick());
 
             const panel = document.getElementById('receiptConfirmPanel');
             if (!panel) return;
 
             panel.addEventListener('click', (event) => {
-                const modeButton = event.target.closest('[data-receipt-mode]');
-                if (modeButton) {
-                    this.mode = modeButton.getAttribute('data-receipt-mode') === 'confirmed' ? 'confirmed' : 'pending';
+                const clearDay = event.target.closest('[data-receipt-clear-day]');
+                if (clearDay) {
+                    this.selectedDate = '';
                     this.render();
                     return;
                 }
@@ -114,6 +117,16 @@
             panel.addEventListener('change', (event) => {
                 const target = event.target;
                 if (!target) return;
+                if (target.matches('[data-receipt-gadud]')) {
+                    this.selectedGadud = target.value || '';
+                    this.render();
+                    return;
+                }
+                if (target.matches('[data-receipt-day]')) {
+                    this.selectedDate = target.value || '';
+                    this.render();
+                    return;
+                }
                 if (target.matches('[data-receipt-confirm]')) {
                     this.onCheckboxChange(target);
                     return;
@@ -122,6 +135,18 @@
                     this.onDateChange(target);
                 }
             });
+        }
+
+        onReceiptTabClick() {
+            if (!this.isAdmin()) return;
+            const now = Date.now();
+            if (this.open) {
+                if (now - this._openedAt < 400) return;
+                this.showCardsView();
+                return;
+            }
+            this._openedAt = now;
+            this.showReceiptView();
         }
 
         isAdmin() {
@@ -150,9 +175,16 @@
             if (table) table.style.display = 'none';
             if (panel) panel.style.display = 'block';
             this.setTabState();
+            if (this._loadPromise) {
+                this.render();
+                return;
+            }
             if (!this.loaded) this.loading = true;
             this.render();
-            await this.load();
+            this._loadPromise = this.load().finally(() => {
+                this._loadPromise = null;
+            });
+            await this._loadPromise;
         }
 
         setTabState() {
@@ -165,6 +197,7 @@
         async load() {
             if (!this.isAdmin()) return;
             if (!window.db || !window.firebaseGetDocs || !window.firebaseCollection) {
+                this.loading = false;
                 this.loadError = 'Firebase עדיין לא מוכן';
                 this.render();
                 return;
@@ -242,19 +275,18 @@
             return Number(record.confirmedQuantity) === batch.cards.length;
         }
 
-        pendingBatches() {
-            return this.buildBatches().filter((batch) => !this.isFullyConfirmed(batch));
-        }
-
-        confirmedBatches() {
-            return this.buildBatches().filter((batch) => this.isFullyConfirmed(batch));
+        batchesForSelection() {
+            if (!this.selectedGadud) return [];
+            return this.buildBatches().filter((batch) => {
+                if (batch.gadudNumber !== this.selectedGadud) return false;
+                if (this.selectedDate && batch.dateKey !== this.selectedDate) return false;
+                return true;
+            });
         }
 
         updateTabBadge() {
             const tab = document.getElementById('receiptViewTab');
-            if (!tab || !this.loaded) return;
-            const pending = this.pendingBatches().length;
-            tab.textContent = pending > 0 ? `אימות קבלה (${pending})` : 'אימות קבלה';
+            if (tab) tab.textContent = 'אימות קבלה';
         }
 
         findBatch(id) {
@@ -392,37 +424,72 @@
             return contacts[gadudNumber] || null;
         }
 
+        gadudOptions() {
+            const options = ['<option value="">בחר גדוד</option>'];
+            Object.keys(GADUD_LABELS).forEach((id) => {
+                const selected = id === this.selectedGadud ? ' selected' : '';
+                options.push(`<option value="${id}"${selected}>${escapeHtml(GADUD_LABELS[id])}</option>`);
+            });
+            return options.join('');
+        }
+
+        renderLists() {
+            if (this.loading && !this.loaded) {
+                return '<div class="receipt-empty">טוען אימותי קבלה...</div>';
+            }
+            if (!this.selectedGadud) {
+                return '<div class="receipt-empty">בחר גדוד כדי לראות רק את הניפוקים שלו.</div>';
+            }
+
+            const batches = this.batchesForSelection();
+            const pending = batches.filter((batch) => !this.isFullyConfirmed(batch));
+            const confirmed = batches.filter((batch) => this.isFullyConfirmed(batch));
+            const dayLabel = this.selectedDate ? formatKey(this.selectedDate) : '';
+
+            if (this.selectedDate && batches.length === 0) {
+                return `<div class="receipt-empty">ביום ${escapeHtml(dayLabel)} לא נופקו כרטיסים לגדוד הזה.</div>`;
+            }
+
+            const pendingBody = pending.length
+                ? pending.map((batch) => this.renderBatch(batch)).join('')
+                : `<div class="receipt-empty">${dayLabel ? `אין ניפוק שממתין ב-${escapeHtml(dayLabel)}.` : 'אין ניפוקים שממתינים לאימות לגדוד הזה.'}</div>`;
+            const confirmedBody = confirmed.length
+                ? confirmed.map((batch) => this.renderBatch(batch)).join('')
+                : `<div class="receipt-empty">${dayLabel ? `אין אימות ב-${escapeHtml(dayLabel)}.` : 'עדיין אין אימותים לגדוד הזה.'}</div>`;
+
+            return `
+                <h4 class="receipt-section-title">ממתינים לאימות</h4>
+                ${pendingBody}
+                <h4 class="receipt-section-title">אומתו</h4>
+                ${confirmedBody}
+            `;
+        }
+
         render() {
             const panel = document.getElementById('receiptConfirmPanel');
             if (!panel) return;
             const startLabel = formatKey(this.startDateKey());
-            const pendingCount = this.loaded ? this.pendingBatches().length : 0;
-            const confirmedCount = this.loaded ? this.confirmedBatches().length : 0;
-            const rows = this.mode === 'confirmed' ? this.confirmedBatches() : this.pendingBatches();
-
-            let body = '';
-            if (this.loading && !this.loaded) {
-                body = '<div class="receipt-empty">טוען אימותי קבלה...</div>';
-            } else if (rows.length === 0) {
-                body = `<div class="receipt-empty">${this.mode === 'confirmed'
-                    ? 'עדיין אין שורות שאושרו.'
-                    : 'אין ניפוקים שממתינים לאימות.'}</div>`;
-            } else {
-                body = rows.map((batch) => this.renderBatch(batch)).join('');
-            }
             const loadNotice = this.loadError
                 ? `<div class="receipt-note">${escapeHtml(this.loadError)}. רשימת הניפוקים מוצגת, אבל אישורים שנשמרו לא נטענו.</div>`
+                : '';
+            const clearDay = this.selectedDate
+                ? '<button type="button" class="receipt-details-btn" data-receipt-clear-day>כל הימים</button>'
                 : '';
 
             panel.innerHTML = `
                 <h3>אימות קבלת כרטיסים</h3>
-                <p class="receipt-panel__note">מוצגים רק ניפוקים מ-${escapeHtml(startLabel)} ואילך. כל שורה היא כמות הכרטיסים שנופקה באותו יום לאותו גדוד. מסמנים את האישור רק אחרי שהגדוד אישר בוואטסאפ שקיבל את הכמות הזו.</p>
-                <div class="receipt-switch">
-                    <button type="button" class="view-tab ${this.mode === 'pending' ? 'view-tab--active' : ''}" data-receipt-mode="pending">ממתינים לאימות${this.loaded ? ` (${pendingCount})` : ''}</button>
-                    <button type="button" class="view-tab ${this.mode === 'confirmed' ? 'view-tab--active' : ''}" data-receipt-mode="confirmed">שאושרו${this.loaded ? ` (${confirmedCount})` : ''}</button>
+                <p class="receipt-panel__note">בוחרים גדוד, ורואים רק אותו. למטה מופיעים קודם ניפוקים שממתינים לאימות, ואחר כך מה שכבר אומת. אפשר לבחור יום ולראות מה נופק בו לגדוד. מוצגים ניפוקים מ-${escapeHtml(startLabel)} ואילך. לחיצה נוספת על אימות קבלה מחזירה לכרטיסים.</p>
+                <div class="receipt-filters">
+                    <label class="receipt-field">גדוד
+                        <select data-receipt-gadud>${this.gadudOptions()}</select>
+                    </label>
+                    <label class="receipt-field">יום
+                        <input type="date" data-receipt-day value="${escapeHtml(this.selectedDate)}" min="${escapeHtml(this.startDateKey())}" max="${escapeHtml(todayKey())}">
+                    </label>
+                    ${clearDay}
                 </div>
                 ${loadNotice}
-                ${body}
+                ${this.renderLists()}
             `;
             this.updateTabBadge();
         }
