@@ -11,6 +11,9 @@ window.APP_CONSTANTS.ALLOWED_FUELS = window.APP_CONSTANTS.ALLOWED_FUELS || [
     'אוריאה'
 ];
 
+// Receipt confirmations start on this day. Cards issued earlier stay out of the screen.
+window.APP_CONSTANTS.RECEIPT_CONFIRMATION_START = window.APP_CONSTANTS.RECEIPT_CONFIRMATION_START || '2026-11-21';
+
 window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS = window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS || {
     '651': { name: 'דור בן לולו', phone: '054-3091641' },
     '652': { name: 'לי נאגר', phone: '050-5559153' },

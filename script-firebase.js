@@ -6,6 +6,9 @@ class FuelCardManager {
         this.uiManager = new window.FuelCardsUIManager(this);
         this.domainService = new window.FuelCardsDomainService(this);
         this.batchManager = new window.BatchOperationsManager(this);
+        this.receiptConfirmation = window.ReceiptConfirmationManager
+            ? new window.ReceiptConfirmationManager(this)
+            : null;
         this.currentUser = this.authManager.getCurrentUser();
         //time to rendor
         this._filterDebounceTimer = null; 
@@ -88,6 +91,9 @@ class FuelCardManager {
 
             if (this.currentUser && this.currentUser.isAdmin) {
                 this.updateAdminSortingControls();
+                if (this.receiptConfirmation) {
+                    await this.receiptConfirmation.load();
+                }
             }
         } catch (error) {
             console.error('שגיאה בטעינת נתונים מ-Firebase:', error);

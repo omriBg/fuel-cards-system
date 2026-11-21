@@ -75,6 +75,34 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /receiptConfirmations/{confirmationId} {
+      function isReceiptAdmin() {
+        return request.auth != null && request.auth.token.email == 'admin@fuelcards-system.com';
+      }
+
+      function validReceipt(data) {
+        return data.issueDateKey is string
+          && data.gadudNumber is string
+          && data.confirmedQuantity is int
+          && data.whatsappVerifyDate is string
+          && data.confirmedAt is string
+          && data.issueDateKey.size() == 10
+          && data.issueDateKey >= '2026-11-21'
+          && data.issueDateKey <= '2100-01-01'
+          && data.gadudNumber.size() <= 20
+          && data.confirmedQuantity > 0
+          && data.confirmedQuantity <= 10000
+          && data.whatsappVerifyDate.size() == 10
+          && data.whatsappVerifyDate >= '2026-11-21'
+          && data.whatsappVerifyDate <= '2100-01-01'
+          && data.confirmedAt.size() > 0
+          && data.confirmedAt.size() <= 40;
+      }
+
+      allow read, delete: if isReceiptAdmin();
+      allow create, update: if isReceiptAdmin() && validReceipt(request.resource.data);
+    }
+
     // Collection 
     match /{document=**} {
       allow read, write: if false;

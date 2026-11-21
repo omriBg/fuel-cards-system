@@ -952,6 +952,181 @@
                 transform: translateY(-20px);
             }
         }
+
+        .view-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 16px 30px 0;
+        }
+
+        .view-tab {
+            background: #f3f3f3;
+            color: #2d5016;
+            border: 1px solid #d5d5d5;
+            border-bottom: none;
+            padding: 10px 18px;
+            border-radius: 3px 3px 0 0;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .view-tab--active {
+            background: #2d5016;
+            color: white;
+            border-color: #2d5016;
+        }
+
+        .receipt-panel {
+            padding: 8px 30px 30px;
+        }
+
+        .receipt-panel__note {
+            color: #444;
+            line-height: 1.55;
+            margin: 8px 0 16px;
+        }
+
+        .receipt-switch {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .receipt-switch .view-tab {
+            border-bottom: 1px solid #d5d5d5;
+            border-radius: 3px;
+        }
+
+        .receipt-empty {
+            padding: 28px 16px;
+            text-align: center;
+            color: #666;
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+        }
+
+        .receipt-row {
+            border: 1px solid #e0e0e0;
+            border-right: 4px solid #c47b00;
+            background: #fff;
+            margin-bottom: 12px;
+            padding: 14px 16px;
+        }
+
+        .receipt-row--done {
+            border-right-color: #2d5016;
+            background: #f7faf4;
+        }
+
+        .receipt-row__facts,
+        .receipt-row__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 28px;
+            align-items: flex-end;
+        }
+
+        .receipt-row__facts {
+            margin-bottom: 14px;
+        }
+
+        .receipt-field .label {
+            display: block;
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 4px;
+        }
+
+        .receipt-field strong {
+            font-size: 1.25em;
+            color: #2d5016;
+        }
+
+        .receipt-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #2d5016;
+        }
+
+        .receipt-check input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .receipt-row input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 1em;
+        }
+
+        .receipt-wa,
+        .receipt-details-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            padding: 8px 12px;
+            border-radius: 3px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            width: auto;
+        }
+
+        .receipt-date-field {
+            min-width: 180px;
+        }
+
+        .receipt-wa {
+            background: #128c7e;
+            color: white;
+        }
+
+        .receipt-wa--disabled {
+            background: #e0e0e0;
+            color: #666;
+            cursor: default;
+        }
+
+        .receipt-details-btn {
+            background: white;
+            color: #2d5016;
+            border: 1px solid #2d5016;
+        }
+
+        .receipt-note {
+            margin-top: 10px;
+            color: #8a4b00;
+            font-weight: 600;
+        }
+
+        .receipt-row__details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e6e6e6;
+        }
+
+        .receipt-row__details p {
+            margin-bottom: 8px;
+        }
+
+        .receipt-card-list {
+            margin: 0;
+            padding-right: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .view-tabs,
+            .receipt-panel {
+                padding-right: 12px;
+                padding-left: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1011,6 +1186,12 @@
                 ">יציאה</button>
             </div>
         </div>
+
+        <nav id="adminViewTabs" class="view-tabs" style="display: none;" aria-label="תצוגת מנהל">
+            <button type="button" id="cardsViewTab" class="view-tab view-tab--active">כרטיסים</button>
+            <button type="button" id="receiptViewTab" class="view-tab">אימות קבלה</button>
+        </nav>
+        <section id="receiptConfirmPanel" class="receipt-panel" style="display: none;" aria-label="אימות קבלת כרטיסים"></section>
 
         <div class="controls">
             <div class="control-card">
@@ -1549,7 +1730,7 @@
     <script type="module">
         // Firebase Configuration
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
         const firebaseConfig = {
@@ -1575,6 +1756,7 @@
         window.firebaseGetDocs = getDocs;
         window.firebaseUpdateDoc = updateDoc;
         window.firebaseDeleteDoc = deleteDoc;
+        window.firebaseSetDoc = setDoc;
         window.firebaseDoc = doc;
         window.firebaseQuery = query;
         window.firebaseWhere = where;
@@ -1644,6 +1826,7 @@
                 await loadScript('batchOperationsManager.js');
                 await loadScript('fuelCardDialogs.js');
                 await loadScript('fuelCardEditFlow.js');
+                await loadScript('receiptConfirmation.js');
                 await loadScript('script-firebase.js');
             } catch (e) {
                 console.error('❌ טעינת סקריפטים נכשלה:', e);

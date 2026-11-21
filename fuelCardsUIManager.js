@@ -55,6 +55,9 @@ class FuelCardsUIManager {
 
     renderTable() {
         this.controller.renderTableCore();
+        if (this.controller.receiptConfirmation) {
+            this.controller.receiptConfirmation.refreshIfVisible();
+        }
     }
 
     updateTableHeaders() {
@@ -171,6 +174,12 @@ class FuelCardsUIManager {
             if (userInfo) userInfo.textContent = `${user.name} - גדוד ${user.gadud}`;
             if (adminPanelBtn) adminPanelBtn.style.display = 'none';
             if (editCardBtn) editCardBtn.style.display = 'none';
+        }
+
+        const receiptTabs = document.getElementById('adminViewTabs');
+        if (receiptTabs) receiptTabs.style.display = user.isAdmin ? 'flex' : 'none';
+        if (!user.isAdmin && this.controller.receiptConfirmation) {
+            this.controller.receiptConfirmation.showCardsView();
         }
 
         if (userInfoDiv) userInfoDiv.style.display = 'block';
