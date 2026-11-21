@@ -458,7 +458,7 @@
                             <span class="label">תאריך</span>
                             <input type="date" data-receipt-date value="${escapeHtml(verifyDate)}" min="${escapeHtml(batch.dateKey)}" max="${escapeHtml(todayKey())}">
                         </label>
-                        <button type="button" class="receipt-details-btn" data-receipt-save>שמור תאריך</button>
+                        <button type="button" class="receipt-details-btn" data-receipt-save>שמור תאריך ואשר</button>
                         <button type="button" class="receipt-details-btn" data-receipt-details aria-expanded="false">כרטיסים שנופקו ביום זה</button>
                     </div>
                     ${mismatch}
