@@ -44,15 +44,6 @@
         return `${dateKey}_${gadudNumber || 'none'}`;
     }
 
-    function whatsAppUrl(phone) {
-        const digits = String(phone || '').replace(/\D/g, '');
-        if (!digits) return '';
-        const international = digits.startsWith('0')
-            ? `972${digits.slice(1)}`
-            : (digits.startsWith('972') ? digits : `972${digits}`);
-        return `https://wa.me/${international}`;
-    }
-
     function formatStamp(iso) {
         const parsed = new Date(iso);
         if (Number.isNaN(parsed.getTime())) return '';
@@ -102,6 +93,12 @@
                     return;
                 }
 
+                const saveButton = event.target.closest('[data-receipt-save]');
+                if (saveButton) {
+                    this.onSaveDate(saveButton);
+                    return;
+                }
+
                 const detailsButton = event.target.closest('[data-receipt-details]');
                 if (!detailsButton) return;
                 const row = detailsButton.closest('[data-batch-id]');
@@ -110,7 +107,7 @@
                 if (!details) return;
                 const willOpen = details.hasAttribute('hidden');
                 details.toggleAttribute('hidden');
-                detailsButton.textContent = willOpen ? 'סגור' : 'הכרטיסים בשורה';
+                detailsButton.textContent = willOpen ? 'סגור' : 'כרטיסים שנופקו ביום זה';
                 detailsButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
             });
 
@@ -126,13 +123,6 @@
                     this.selectedDate = target.value || '';
                     this.render();
                     return;
-                }
-                if (target.matches('[data-receipt-confirm]')) {
-                    this.onCheckboxChange(target);
-                    return;
-                }
-                if (target.matches('[data-receipt-date]')) {
-                    this.onDateChange(target);
                 }
             });
         }
@@ -304,81 +294,27 @@
             return value >= batch.dateKey && value <= todayKey();
         }
 
-        async onCheckboxChange(checkbox) {
-            const row = checkbox.closest('[data-batch-id]');
-            if (!row) return;
-            const id = row.getAttribute('data-batch-id');
-            const batch = this.findBatch(id);
-            if (!batch) {
-                checkbox.checked = false;
+        async onSaveDate(button) {
+            const row = button.closest('[data-batch-id]');
+            if (!row || button.disabled) return;
+            const batch = this.findBatch(row.getAttribute('data-batch-id'));
+            const input = row.querySelector('[data-receipt-date]');
+            const verifyDate = input ? input.value : '';
+            if (!batch || !this.isValidVerifyDate(verifyDate, batch)) {
+                this.controller.showStatus('התאריך צריך להיות מיום הניפוק ועד היום', 'error');
+                if (input) input.focus();
                 return;
             }
 
-            if (!checkbox.checked) {
-                const approved = window.confirm('לבטל את אישור הקבלה של הכמות הזו?');
-                if (!approved) {
-                    checkbox.checked = true;
-                    return;
-                }
-                checkbox.disabled = true;
-                try {
-                    await this.deleteConfirmation(id);
-                    this.controller.showStatus('אישור הקבלה בוטל', 'success');
-                    this.render();
-                } catch (error) {
-                    console.error(error);
-                    checkbox.checked = true;
-                    checkbox.disabled = false;
-                    this.controller.showStatus('לא הצלחתי לבטל את האישור', 'error');
-                }
-                return;
-            }
-
-            const dateInput = row.querySelector('[data-receipt-date]');
-            const verifyDate = dateInput ? dateInput.value : '';
-            if (!this.isValidVerifyDate(verifyDate, batch)) {
-                checkbox.checked = false;
-                this.controller.showStatus('לפני הסימון צריך תאריך אימות בוואטסאפ, מיום הניפוק ועד היום', 'error');
-                if (dateInput) dateInput.focus();
-                return;
-            }
-
-            checkbox.disabled = true;
+            button.disabled = true;
             try {
                 await this.saveConfirmation(batch, verifyDate);
-                this.controller.showStatus('הגדוד סומן כמי שאישר את קבלת הכרטיסים', 'success');
+                this.controller.showStatus('התאריך נשמר', 'success');
                 this.render();
             } catch (error) {
                 console.error(error);
-                checkbox.checked = false;
-                checkbox.disabled = false;
-                this.controller.showStatus('לא הצלחתי לשמור את האישור', 'error');
-            }
-        }
-
-        async onDateChange(input) {
-            const row = input.closest('[data-batch-id]');
-            if (!row) return;
-            const checkbox = row.querySelector('[data-receipt-confirm]');
-            if (!checkbox || !checkbox.checked) return;
-            const id = row.getAttribute('data-batch-id');
-            const batch = this.findBatch(id);
-            const record = batch ? this.recordFor(batch) : null;
-            if (!batch || !this.isValidVerifyDate(input.value, batch)) {
-                if (record && record.whatsappVerifyDate) input.value = record.whatsappVerifyDate;
-                this.controller.showStatus('תאריך האימות בוואטסאפ צריך להיות מיום הניפוק ועד היום', 'error');
-                return;
-            }
-            input.disabled = true;
-            try {
-                await this.saveConfirmation(batch, input.value);
-                this.controller.showStatus('תאריך האימות עודכן', 'success');
-                this.render();
-            } catch (error) {
-                console.error(error);
-                input.disabled = false;
-                if (record && record.whatsappVerifyDate) input.value = record.whatsappVerifyDate;
-                this.controller.showStatus('לא הצלחתי לעדכן את תאריך האימות', 'error');
+                button.disabled = false;
+                this.controller.showStatus('לא הצלחתי לשמור את התאריך', 'error');
             }
         }
 
@@ -404,24 +340,9 @@
             this.updateTabBadge();
         }
 
-        async deleteConfirmation(id) {
-            if (!this.isAdmin()) throw new Error('unauthorized');
-            if (!window.firebaseDeleteDoc || !window.firebaseDoc || !window.db) {
-                throw new Error('firebase deleteDoc missing');
-            }
-            await window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'receiptConfirmations', id));
-            this.confirmations.delete(id);
-            this.updateTabBadge();
-        }
-
         gadudLabel(gadudNumber) {
             if (!gadudNumber) return 'ללא גדוד';
             return GADUD_LABELS[gadudNumber] || `גדוד ${gadudNumber}`;
-        }
-
-        contactFor(gadudNumber) {
-            const contacts = this.controller.adminGadudContacts || {};
-            return contacts[gadudNumber] || null;
         }
 
         gadudOptions() {
@@ -497,9 +418,7 @@
         renderBatch(batch) {
             const record = this.recordFor(batch);
             const confirmed = this.isFullyConfirmed(batch);
-            const contact = this.contactFor(batch.gadudNumber);
-            const link = contact ? whatsAppUrl(contact.phone) : '';
-            const verifyDate = record && record.whatsappVerifyDate ? record.whatsappVerifyDate : '';
+            const verifyDate = record && record.whatsappVerifyDate ? record.whatsappVerifyDate : batch.dateKey;
             const quantityChanged = record && !confirmed;
             const cards = batch.cards
                 .slice()
@@ -511,18 +430,11 @@
                 return `<li>כרטיס ${number}${name ? ` — ${escapeHtml(name)}` : ''}</li>`;
             }).join('');
 
-            const whatsApp = link
-                ? `<a class="receipt-wa" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">פתח וואטסאפ${contact.name ? ` · ${escapeHtml(contact.name)}` : ''}</a>`
-                : '<span class="receipt-wa receipt-wa--disabled">אין איש קשר לוואטסאפ</span>';
-
             const savedLine = confirmed && record && record.confirmedAt
-                ? `<p>האישור נשמר במערכת ב-${escapeHtml(formatStamp(record.confirmedAt))}.</p>`
+                ? `<p>התאריך נשמר במערכת ב-${escapeHtml(formatStamp(record.confirmedAt))}.</p>`
                 : '';
-            const statusLine = confirmed
-                ? `<p>הגדוד אישר שקיבל ${batch.cards.length} כרטיסים שנופקו ב-${escapeHtml(formatKey(batch.dateKey))}. תאריך האימות בוואטסאפ: ${escapeHtml(formatKey(verifyDate))}.</p>`
-                : '<p>אלה הכרטיסים שנכללים בכמות של השורה הזו.</p>';
             const mismatch = quantityChanged
-                ? `<div class="receipt-note">הכמות השתנתה אחרי אימות קודם (אושרו ${escapeHtml(record.confirmedQuantity)}, עכשיו ${batch.cards.length}). צריך אישור מחדש על הכמות העדכנית.</div>`
+                ? `<div class="receipt-note">הכמות השתנתה אחרי השמירה (נשמרו ${escapeHtml(record.confirmedQuantity)}, עכשיו ${batch.cards.length}). צריך לשמור שוב את התאריך.</div>`
                 : '';
 
             return `
@@ -542,20 +454,15 @@
                         </div>
                     </div>
                     <div class="receipt-row__actions">
-                        <label class="receipt-check">
-                            <input type="checkbox" data-receipt-confirm ${confirmed ? 'checked' : ''}>
-                            הגדוד אישר שקיבל
-                        </label>
                         <label class="receipt-field receipt-date-field">
-                            <span class="label">תאריך אימות בוואטסאפ</span>
+                            <span class="label">תאריך</span>
                             <input type="date" data-receipt-date value="${escapeHtml(verifyDate)}" min="${escapeHtml(batch.dateKey)}" max="${escapeHtml(todayKey())}">
                         </label>
-                        ${whatsApp}
-                        <button type="button" class="receipt-details-btn" data-receipt-details aria-expanded="false">הכרטיסים בשורה</button>
+                        <button type="button" class="receipt-details-btn" data-receipt-save>שמור תאריך</button>
+                        <button type="button" class="receipt-details-btn" data-receipt-details aria-expanded="false">כרטיסים שנופקו ביום זה</button>
                     </div>
                     ${mismatch}
                     <div class="receipt-row__details" hidden>
-                        ${statusLine}
                         ${savedLine}
                         <ul class="receipt-card-list">${cardItems}</ul>
                     </div>
