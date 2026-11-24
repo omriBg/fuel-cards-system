@@ -13,6 +13,10 @@ class FuelCardManager {
         //time to rendor
         this._filterDebounceTimer = null; 
         this.filterDebounceMs = 200;
+        this.bulkIssue = {
+            active: false,
+            data: null
+        };
        
         // Loaded from `app-constants.js`     //2
         this.adminGadudContacts = (window.APP_CONSTANTS && window.APP_CONSTANTS.ADMIN_GADUD_CONTACTS)      
@@ -866,8 +870,66 @@ class FuelCardManager {
         gadudSelect.addEventListener('change', () => this.handleGadudSelectionChange());
     }
 
+    enableBulkIssue(data) {
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            return;
+        }
+        this.bulkIssue.active = true;
+        this.bulkIssue.data = { ...data };
+        this.applyBulkIssueDataToForm();
+        this.updateBulkIssueUI();
+        this.showStatus('מצב מקבץ הופעל - ניתן לנפק מספר כרטיסים לאותו גורם', 'success');
+    }
+
+    disableBulkIssue(showMessage = true) {
+        if (!this.bulkIssue) return;
+        this.bulkIssue.active = false;
+        this.bulkIssue.data = null;
+        this.updateBulkIssueUI();
+        if (showMessage && this.currentUser && this.currentUser.isAdmin) {
+            this.showStatus('מצב מקבץ בוטל', 'info');
+        }
+    }
+
+    isBulkIssueActive() {
+        return !!(this.currentUser && this.currentUser.isAdmin && this.bulkIssue && this.bulkIssue.active && this.bulkIssue.data);
+    }
+
+    applyBulkIssueDataToForm() {
+        if (!this.isBulkIssueActive()) return;
+        const { name, phone, gadudNumber } = this.bulkIssue.data;
+        const nameInput = document.getElementById('newName');
+        const phoneInput = document.getElementById('newPhone');
+        const gadudSelect = document.getElementById('newGadudNumber');
+        if (nameInput) nameInput.value = name || '';
+        if (phoneInput) phoneInput.value = phone || '';
+        if (gadudSelect) gadudSelect.value = gadudNumber || '';
+    }
+
+    updateBulkIssueUI() {
+        const controls = document.getElementById('bulkIssueControls');
+        const statusText = document.getElementById('bulkIssueStatus');
+        if (!controls) return;
+        if (!this.currentUser || !this.currentUser.isAdmin) {
+            controls.style.display = 'none';
+            return;
+        }
+        controls.style.display = 'block';
+        if (!statusText) return;
+        if (this.isBulkIssueActive()) {
+            statusText.textContent = `פעיל (${this.bulkIssue.data.name || ''})`;
+            controls.classList.add('bulk-issue--active');
+        } else {
+            statusText.textContent = 'כבוי';
+            controls.classList.remove('bulk-issue--active');
+        }
+    }
+
     handleGadudSelectionChange() {
         if (!this.currentUser || !this.currentUser.isAdmin) {
+            return;
+        }
+        if (this.isBulkIssueActive()) {
             return;
         }
         const gadudSelect = document.getElementById('newGadudNumber');
@@ -1070,6 +1132,7 @@ class FuelCardManager {
     }
 
     async logout() {
+        this.disableBulkIssue(false);
         return this.authManager.logout();
     }
 
@@ -1656,6 +1719,9 @@ function showTypingForm(action) {
     
     if (action === 'new') {
         document.getElementById('newCardForm').style.display = 'block';
+        if (window.fuelCardManager && window.fuelCardManager.isBulkIssueActive()) {
+            window.fuelCardManager.applyBulkIssueDataToForm();
+        }
     } else if (action === 'update') {
         document.getElementById('updateCardForm').style.display = 'block';
     } else if (action === 'return') {
@@ -1811,6 +1877,34 @@ function clearNewCardForm() {
     }
     resetFuelTypeSelector('newFuelType');
     resetAmountSelector('newAmount');
+    if (window.fuelCardManager && window.fuelCardManager.isBulkIssueActive()) {
+        window.fuelCardManager.applyBulkIssueDataToForm();
+    }
+}
+
+function activateBulkIssue() {
+    if (!window.fuelCardManager || !window.fuelCardManager.currentUser || !window.fuelCardManager.currentUser.isAdmin) {
+        if (window.fuelCardManager) {
+            window.fuelCardManager.showStatus('מצב מקבץ זמין רק למנהל מערכת', 'error');
+        }
+        return;
+    }
+    const name = document.getElementById('newName').value.trim();
+    const phone = document.getElementById('newPhone').value.trim();
+    const gadudNumber = document.getElementById('newGadudNumber').value;
+    if (!name || !phone || !gadudNumber) {
+        window.fuelCardManager.showStatus('יש למלא שם, טלפון ומספר גדוד לפני הפעלת מקבץ', 'error');
+        return;
+    }
+    window.fuelCardManager.enableBulkIssue({ name, phone, gadudNumber });
+}
+
+function deactivateBulkIssue() {
+    if (!window.fuelCardManager || !window.fuelCardManager.currentUser || !window.fuelCardManager.currentUser.isAdmin) {
+        return;
+    }
+    window.fuelCardManager.disableBulkIssue();
+    clearNewCardForm();
 }
 
 function clearUpdateCardForm() {
@@ -2053,6 +2147,12 @@ function initDomEventBindings() {
                 break;
             case 'submitNewCard':
                 submitNewCard();
+                break;
+            case 'activateBulkIssue':
+                activateBulkIssue();
+                break;
+            case 'deactivateBulkIssue':
+                deactivateBulkIssue();
                 break;
             case 'submitUpdateCard':
                 submitUpdateCard();

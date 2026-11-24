@@ -1343,6 +1343,19 @@
                     </div>
                 </div>
             </div>
+            <div id="bulkIssueControls" class="bulk-issue">
+                <div class="bulk-issue__header">
+                    <h5>מקבץ ניפוק (מנהל מערכת)</h5>
+                    <span id="bulkIssueStatus" class="bulk-issue__status">כבוי</span>
+                </div>
+                <p class="bulk-issue__hint">
+                    במצב מקבץ, שם, טלפון ומספר גדוד נשמרים לניפוקים נוספים עבור אותו גורם.
+                </p>
+                <div class="bulk-issue__actions">
+                    <button type="button" class="bulk-btn primary" data-action="activateBulkIssue">שמור מקבץ</button>
+                    <button type="button" class="bulk-btn secondary" data-action="deactivateBulkIssue">בטל מקבץ</button>
+                </div>
+            </div>
             <div class="form-group">
                 <label for="newIssueDate">תאריך ושעת ניפוק:</label>
                 <input type="datetime-local" id="newIssueDate" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em;">

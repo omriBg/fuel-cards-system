@@ -224,6 +224,10 @@ class FuelCardsUIManager {
             if (title === 'ניפוק כרטיס חדש' || title === 'עדכון כרטיס' || title === 'החזרת כרטיס') adminControlCards.push(card);
         });
 
+        if (this.controller.updateBulkIssueUI) {
+            this.controller.updateBulkIssueUI();
+        }
+
         if (user.isAdmin) {
             adminButtons.forEach((selector) => document.querySelectorAll(selector).forEach((btn) => { btn.style.display = 'block'; }));
             gadudButtons.forEach((selector) => document.querySelectorAll(selector).forEach((btn) => { btn.style.display = 'block'; }));
