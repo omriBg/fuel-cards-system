@@ -669,44 +669,40 @@ class FuelCardManager {
     
     parseDateString(dateStr) {
         if (!dateStr || typeof dateStr !== 'string') return null;
-        
-        const cleaned = dateStr.trim();
+
+        const cleaned = dateStr.trim().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
         if (!cleaned) return null;
-        
-        const direct = new Date(cleaned);
-        if (!isNaN(direct.getTime())) return direct;
-        
-        
-        const datePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
-        const match = cleaned.match(datePattern);
-        
-        if (match) {
-            const day = parseInt(match[1], 10);
-            const month = parseInt(match[2], 10) - 1; 
-            let year = parseInt(match[3], 10);
-            
-            if (year < 100) {
-                year = 2000 + year;
-            }
-            
-            const hour = match[4] ? parseInt(match[4], 10) : 0;
-            const minute = match[5] ? parseInt(match[5], 10) : 0;
-            const second = match[6] ? parseInt(match[6], 10) : 0;
-            
-            const parsed = new Date(year, month, day, hour, minute, second);
-            if (!isNaN(parsed.getTime())) return parsed;
+
+        const build = (year, month, day, hour, minute, second) => {
+            const y = Number(year);
+            const m = Number(month);
+            const d = Number(day);
+            const hh = hour == null || hour === '' ? 0 : Number(hour);
+            const mm = minute == null || minute === '' ? 0 : Number(minute);
+            const ss = second == null || second === '' ? 0 : Number(second);
+            if (![y, m, d, hh, mm, ss].every(Number.isInteger)) return null;
+            if (m < 1 || m > 12 || d < 1 || d > 31 || hh > 23 || mm > 59 || ss > 59) return null;
+            const parsed = new Date(y, m - 1, d, hh, mm, ss);
+            if (Number.isNaN(parsed.getTime())) return null;
+            if (parsed.getFullYear() !== y || parsed.getMonth() !== m - 1 || parsed.getDate() !== d) return null;
+            return parsed;
+        };
+
+        // Date input value. Keep the calendar day local; new Date("YYYY-MM-DD") is UTC
+        // and can land on the previous day.
+        const iso = cleaned.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (iso) return build(iso[1], iso[2], iso[3], iso[4], iso[5], iso[6]);
+
+        // Saved text is day.month.year, e.g. "12.10.2026, 14:30" for 12 October.
+        // Chrome's new Date() reads that as month.day whenever both numbers are <= 12,
+        // so the same card shows up as 10 December. Always read this form day-first.
+        const local = cleaned.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[\s,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (local) {
+            let year = parseInt(local[3], 10);
+            if (year < 100) year += 2000;
+            return build(year, local[2], local[1], local[4], local[5], local[6]);
         }
-        
-        const isoPattern = /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/;
-        const isoMatch = cleaned.match(isoPattern);
-        if (isoMatch) {
-            const year = parseInt(isoMatch[1], 10);
-            const month = parseInt(isoMatch[2], 10) - 1;
-            const day = parseInt(isoMatch[3], 10);
-            const parsed = new Date(year, month, day);
-            if (!isNaN(parsed.getTime())) return parsed;
-        }
-        
+
         return null;
     }
 
